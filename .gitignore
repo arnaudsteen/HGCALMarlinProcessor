@@ -1,0 +1,8 @@
+*.slcio
+*.root
+*.xml
+build/
+lib/
+src/*~
+include/*~
+to-do
