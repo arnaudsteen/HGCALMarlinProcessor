@@ -47,8 +47,8 @@ FOREACH( pkg CaloSoftWare )
     ADD_DEFINITIONS ( ${${pkg}_DEFINITIONS} )
 ENDFOREACH()
 
-FIND_PACKAGE( EIGEN3 REQUIRED )
-INCLUDE_DIRECTORIES( ${Eigen3_INCLUDE_DIR} )
+#FIND_PACKAGE( EIGEN3 REQUIRED )
+#INCLUDE_DIRECTORIES( ${Eigen3_INCLUDE_DIR} )
 ### DOCUMENTATION ###########################################################
 
 OPTION( INSTALL_DOC "Set to OFF to skip build/install Documentation" ON )
