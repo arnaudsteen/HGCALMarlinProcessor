@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source /Users/arnaudsteen/ilcsoft/init_ilcsoft.sh
-export MARLIN_DLL=/Users/arnaudsteen/HGCAL/HGCALMarlinProcessors/lib/libhgcalMarlin.dylib
+export MARLIN_DLL=/Users/arnaudsteen/HGCAL/HGCALMarlinProcessor/lib/libhgcalMarlin.dylib
 
 particle=$1
 energy=$2
