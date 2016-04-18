@@ -10,6 +10,7 @@
 #include <map>
 
 #include "CaloObject/CaloHit.h"
+#include "CaloObject/CaloGeom.h"
 #include "Algorithm/Cluster.h"
 #include "Algorithm/Tracking.h"
 #include "Algorithm/ClusteringHelper.h"
@@ -68,9 +69,17 @@ class hgcalEfficiencyProcessor : public Processor {
   std::map<int,std::vector<caloobject::CaloHit*> > hitMap;
   
   /*--------------------Global parameters--------------------*/
-  int _nActiveLayers;
   int numElements;
   LCCollection * col;
+  std::vector<float> edges; //vector to recover geometry parameters
+  /*------------------------------------------------------------------------------*/
+
+  /*--------------------CaloObjects list to initialise--------------------*/
+  std::vector<caloobject::CaloLayer*> layers;
+  /*----------------------------------------------------------------------*/
+
+  /*--------------------Algorithms setting parameter structure--------------------*/
+  caloobject::GeomParameterSetting m_CaloGeomSetting;
   /*------------------------------------------------------------------------------*/
 
   /*--------------------Algorithms list to initialise--------------------*/
@@ -88,14 +97,6 @@ class hgcalEfficiencyProcessor : public Processor {
    algorithm::InteractionFinderParameterSetting m_InteractionFinderParameterSetting; 
    algorithm::EfficiencyParameterSetting m_EfficiencyParameterSetting; 
   /*------------------------------------------------------------------------------*/
-  
-  /*--------------------CaloObject setting parameter structure--------------------*/
-   caloobject::LayerParameterSetting m_LayerParameterSetting;
-  /*------------------------------------------------------------------------------*/
-
-  /*--------------------CaloObject list to initialise--------------------*/
-   std::vector<caloobject::CaloLayer*> layers;
-  /*---------------------------------------------------------------------*/
   
   /*--------------------Root output object--------------------*/
   std::string outputRootName;

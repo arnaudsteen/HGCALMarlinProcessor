@@ -33,10 +33,44 @@ hgcalEfficiencyProcessor::hgcalEfficiencyProcessor() : Processor("hgcalEfficienc
 			      outputRootName,
 			      std::string("toto.root") ); 
 
-  registerProcessorParameter( "NActiveLayers" ,
-			      "Number of active layers",
-			      _nActiveLayers,
-			      int(28) );
+  /*------------caloobject::CaloGeom------------*/
+  registerProcessorParameter( "Geometry::NLayers" ,
+ 			      "Number of layers",
+ 			      m_CaloGeomSetting.nLayers,
+ 			      (int) 28 ); 
+  registerProcessorParameter( "Geometry::NPixelsPerLayer" ,
+ 			      "Number of pixels per layer (assume square geometry)",
+ 			      m_CaloGeomSetting.nPixelsPerLayer,
+ 			      (int) 64 ); 
+  registerProcessorParameter( "Geometry::PixelSize" ,
+ 			      "Pixel size (assume square pixels)",
+ 			      m_CaloGeomSetting.pixelSize,
+ 			      (float) 10.0 ); 
+
+  std::vector<float> vec;
+  vec.push_back(-320.0);
+  vec.push_back(320.0);
+  registerProcessorParameter( "Geometry::DetectorTransverseSize" ,
+     			      "Define the detector transverse size used by efficiency algorithm (vector size must be 2 or 4; if 2 -> first value is min, second value is max; if 4 -> two first values define x edges , two last values define y edges) ",
+     			      edges,
+     			      vec ); 
+  if( edges.size()==2 ){
+     m_CaloGeomSetting.xmin=edges[0];
+     m_CaloGeomSetting.ymin=edges[0];
+     m_CaloGeomSetting.xmax=edges[1];
+     m_CaloGeomSetting.ymax=edges[1];
+   } 
+   else if( edges.size()==4 ){
+     m_CaloGeomSetting.xmin=edges[0];
+     m_CaloGeomSetting.xmax=edges[1];
+     m_CaloGeomSetting.ymin=edges[2];
+     m_CaloGeomSetting.ymax=edges[3];
+   }
+  else{
+    std::cout << "WARING : Wrong number of values in paramater Geometry::DetectorTransverseSize => will use default value -500.0, +500.0" << std::endl;
+  }
+  /*--------------------------------------------*/
+
   /*------------algorithm::Cluster------------*/
   registerProcessorParameter( "MaxTransversalCellID" ,
  			      "Maximum difference between two hits cellID (0 and 1) to build a cluster",
@@ -134,31 +168,6 @@ hgcalEfficiencyProcessor::hgcalEfficiencyProcessor() : Processor("hgcalEfficienc
     			      m_InteractionFinderParameterSetting.minNumberOfCluster,
     			      (int) 3 ); 
 
-  /*------------caloobject::Layer-----------*/
-  // std::vector<float> vec,cev;
-  // vec.push_back(-320.0);
-  // vec.push_back(320.0);
-  // registerProcessorParameter( "Layer::DetectorTransversalSize" ,
-  //   			      "Define the detector transversal size used by efficiency algorithm (vector size must be 2 or 4; if 2 -> first value is min, second value is max; if 4 -> two first values define x edges , two last values define y edges) ",
-  //   			      cev,
-  //   			      vec ); 
-  // if( cev.size()==2 ){
-  //   m_LayerParameterSetting.edgeX_min=cev[0];
-  //   m_LayerParameterSetting.edgeY_min=cev[0];
-  //   m_LayerParameterSetting.edgeX_max=cev[1];
-  //   m_LayerParameterSetting.edgeY_max=cev[1];
-  // } 
-  // else if( cev.size()==4 ){
-  //   m_LayerParameterSetting.edgeX_min=cev[0];
-  //   m_LayerParameterSetting.edgeX_max=cev[1];
-  //   m_LayerParameterSetting.edgeY_min=cev[2];
-  //   m_LayerParameterSetting.edgeY_max=cev[3];
-  // }
-  // else{
-  //   std::cout << "Wrong number of values in paramater Layer::DetectorTransversalSize ----> THROW" << std::endl;
-  //   throw;
-  // }
-
 }
 
 
@@ -193,6 +202,10 @@ void hgcalEfficiencyProcessor::init()
   _nRun = 0 ;
   _nEvt = 0 ;
 
+  /*--------------------Geometry initialisation--------------------*/
+  m_EfficiencyParameterSetting.geometry = m_CaloGeomSetting;
+  /*---------------------------------------------------------------*/
+
   /*--------------------Algorithms initialisation--------------------*/
   algo_Cluster=new algorithm::Cluster();
   algo_Cluster->SetClusterParameterSetting(m_ClusterParameterSetting);
@@ -209,9 +222,8 @@ void hgcalEfficiencyProcessor::init()
   algo_Efficiency=new algorithm::Efficiency();
   algo_Efficiency->SetEfficiencyParameterSetting(m_EfficiencyParameterSetting);
 
-  for(int i=0; i<_nActiveLayers; i++){
+  for(int i=0; i<m_CaloGeomSetting.nLayers; i++){
     caloobject::CaloLayer* aLayer=new caloobject::CaloLayer(i);
-    aLayer->setLayerParameterSetting(m_LayerParameterSetting);
     layers.push_back(aLayer);
   }
 }
@@ -265,9 +277,9 @@ void hgcalEfficiencyProcessor::LayerProperties(std::vector<caloobject::CaloClust
   int trackBegin= (*clusters.begin())->getLayerID();
   int trackEnd=(*(clusters.end()-1))->getLayerID();
   if(trackBegin==1) trackBegin=0;
-  if(trackEnd==_nActiveLayers-2) trackEnd=_nActiveLayers-1;
+  if(trackEnd==m_CaloGeomSetting.nLayers-2) trackEnd=m_CaloGeomSetting.nLayers-1;
   
-  for(int i=0; i<_nActiveLayers; i++){
+  for(int i=0; i<m_CaloGeomSetting.nLayers; i++){
     _efficiency.push_back(-1); 
     _effEnergy.push_back(0); 
     _multiplicity.push_back(0); 
@@ -341,7 +353,7 @@ void hgcalEfficiencyProcessor::check( LCEvent * evt ) {
 
 
 void hgcalEfficiencyProcessor::end(){ 
-  
+
   delete algo_Cluster;
   delete algo_ClusteringHelper;
   delete algo_Tracking;

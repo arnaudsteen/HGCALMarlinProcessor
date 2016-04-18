@@ -29,16 +29,6 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
 			    _hgcalCollections  ,
 			    hgcalCollections);
 
-  registerProcessorParameter( "NActiveLayers" ,
-			      "Number of active layers" ,
-			      _nActiveLayers ,
-			      int(28) );
-
-  registerProcessorParameter( "NPixlesPerLayer" ,
-			      "Number of pixels per active layers (assuming square geometry)" ,
-			      _nPixelsPerLayer ,
-			      int(64) );
-
   registerProcessorParameter( "OutputName" ,
 			      "Name of the output root file " ,
 			      _outName ,
@@ -48,6 +38,21 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
 			      "Maximum distance between track expected projection and gun position" ,
 			      _efficiencyDistance,
 			      (float)15.0 );
+
+  /*------------caloobject::CaloGeom------------*/
+  registerProcessorParameter( "Geometry::NLayers" ,
+ 			      "Number of layers",
+ 			      m_CaloGeomSetting.nLayers,
+ 			      (int) 28 ); 
+  registerProcessorParameter( "Geometry::NPixelsPerLayer" ,
+ 			      "Number of pixels per layer (assume square geometry)",
+ 			      m_CaloGeomSetting.nPixelsPerLayer,
+ 			      (int) 64 ); 
+  registerProcessorParameter( "Geometry::PixelSize" ,
+ 			      "Pixel size (assume square pixels)",
+ 			      m_CaloGeomSetting.pixelSize,
+ 			      (float) 10.0 ); 
+  /*--------------------------------------------*/
 
   /*------------algorithm::Cluster------------*/
   registerProcessorParameter( "MaxTransversalCellID" ,
@@ -164,11 +169,6 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
     			      m_HoughParameterSetting.isolationDistance,
     			      (int) 2 );
 
-  registerProcessorParameter( "Hough::PadSize" ,
-    			      "Transversal pad (pixel) size (assuming square geometry)",
-    			      m_HoughParameterSetting.padSize,
-    			      (float) 10.0 );
-
   registerProcessorParameter( "Hough::PrintDebug" ,
     			      "If true, Hough algorithm will print some debug information",
     			      m_HoughParameterSetting.printDebug,
@@ -182,6 +182,10 @@ void houghEfficiencyProcessor::init()
 
   _nRun = 0 ;
   _nEvt = 0 ;
+
+  /*--------------------Geomttry initialisation--------------------*/
+  m_HoughParameterSetting.geometry=m_CaloGeomSetting;
+  /*---------------------------------------------------------------*/
 
   /*--------------------Algorithms initialisation--------------------*/
   algo_Cluster=new algorithm::Cluster();
@@ -211,6 +215,8 @@ void houghEfficiencyProcessor::init()
   outTree->Branch("distanceToVertex",&distanceToVertex);
   outTree->Branch("ntrack",&ntrack);
   outTree->Branch("cosTheta",&cosTheta);
+  outTree->Branch("eta",&eta);
+  outTree->Branch("theta",&theta);
   
   hDistance=new TH1D("hDistance","Distance",100,0,50);
   hEfficiency=new TH1D("hEfficiency","Efficiency",100,0,2);
@@ -266,6 +272,8 @@ void houghEfficiencyProcessor::fillHistograms(std::vector<caloobject::CaloTrack*
     if( dist<minDist ){
       minDist=dist;
       cosTheta=(*it)->getCosTheta();
+      eta=(*it)->orientationVector().eta();
+      theta=(*it)->orientationVector().theta();
     }
   }
   

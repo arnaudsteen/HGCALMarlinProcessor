@@ -31,21 +31,30 @@ hgcalDisplayProcessor::hgcalDisplayProcessor() : Processor("hgcalDisplayProcesso
 			    _hgcalCollections  ,
 			    hgcalCollections);
 
-  registerProcessorParameter( "NActiveLayers" ,
-			      "Number of active layers" ,
-			      _nActiveLayers ,
-			      int(28) );
-
-  registerProcessorParameter( "NPixelsPerLayer" ,
-			      "Number of pixels per active layers (assuming square geometry)" ,
-			      _nPixelsPerLayer ,
-			      int(64) );
-
   registerProcessorParameter( "PrefixPlotName" ,
 			      "Prefix name for generated plots" ,
 			      _prefixPlotName ,
 			      std::string("muon") );
 
+  registerProcessorParameter( "PauseAfterDraw" ,
+			      "Boolean to set if a pause is wanted after diplaying event (using WaitPrimitive method of TCanvas)" ,
+			      _pauseAfterDraw ,
+			      (bool) false );
+  /*------------caloobject::CaloGeom------------*/
+  registerProcessorParameter( "Geometry::NLayers" ,
+ 			      "Number of layers",
+ 			      m_CaloGeomSetting.nLayers,
+ 			      (int) 28 ); 
+  registerProcessorParameter( "Geometry::NPixelsPerLayer" ,
+ 			      "Number of pixels per layer (assume square geometry)",
+ 			      m_CaloGeomSetting.nPixelsPerLayer,
+ 			      (int) 64 ); 
+  registerProcessorParameter( "Geometry::PixelSize" ,
+ 			      "Pixel size (assume square pixels)",
+ 			      m_CaloGeomSetting.pixelSize,
+ 			      (float) 10.0 ); 
+  /*--------------------------------------------*/
+  
   /*------------algorithm::Cluster------------*/
   registerProcessorParameter( "MaxTransversalCellID" ,
  			      "Maximum difference between two hits cellID (0 and 1) to build a cluster",
@@ -180,6 +189,10 @@ void hgcalDisplayProcessor::init()
   _nRun = 0 ;
   _nEvt = 0 ;
 
+  /*--------------------Geomttry initialisation--------------------*/
+  m_HoughParameterSetting.geometry=m_CaloGeomSetting;
+  /*---------------------------------------------------------------*/
+  
   /*--------------------Algorithms initialisation--------------------*/
   algo_Cluster=new algorithm::Cluster();
   algo_Cluster->SetClusterParameterSetting(m_ClusterParameterSetting);
@@ -195,7 +208,7 @@ void hgcalDisplayProcessor::init()
 
   algo_Hough=new algorithm::Hough();
   algo_Hough->SetHoughParameterSetting(m_HoughParameterSetting);
-  
+  /*-----------------------------------------------------------------*/
   gStyle->SetOptStat(0);
   int argc=0;
   char* argv=(char*)"";
@@ -235,7 +248,7 @@ void hgcalDisplayProcessor::init()
   TH2D *h=NULL;
   for(unsigned int i=0; i<histoName.size(); ++i){
     if( histoName.at(i).find("space")<histoName.at(i).size() ){
-      h=new TH2D(histoName.at(i).c_str(),"",4*_nActiveLayers,0.0,_nActiveLayers,4*_nPixelsPerLayer,0.0,_nPixelsPerLayer);
+      h=new TH2D(histoName.at(i).c_str(),"",4*m_CaloGeomSetting.nLayers,0.0,m_CaloGeomSetting.nLayers,4*m_CaloGeomSetting.nPixelsPerLayer,0.0,m_CaloGeomSetting.nPixelsPerLayer);
       h->SetMarkerStyle(20);
       h->SetMarkerSize(.5);
       h->GetXaxis()->SetTitle("layer");
@@ -310,7 +323,8 @@ void hgcalDisplayProcessor::drawHistos()
   canvasMap[ std::string("spaceYZ") ]->Update();
   canvasMap[ std::string("spaceYZ") ]->SaveAs(name.str().c_str());
   //sleep(3);
-  canvasMap.begin()->second->WaitPrimitive();
+  if(_pauseAfterDraw)
+    canvasMap.begin()->second->WaitPrimitive();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -421,7 +435,6 @@ void hgcalDisplayProcessor::check( LCEvent * evt ) {
 
 
 void hgcalDisplayProcessor::end(){ 
-  
   delete algo_Cluster;
   delete algo_ClusteringHelper;
   delete algo_Tracking;

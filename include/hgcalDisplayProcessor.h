@@ -10,6 +10,7 @@
 #include <map>
 
 #include "CaloObject/CaloHit.h"
+#include "CaloObject/CaloGeom.h"
 #include "Algorithm/Cluster.h"
 #include "Algorithm/Tracking.h"
 #include "Algorithm/ClusteringHelper.h"
@@ -83,12 +84,16 @@ class hgcalDisplayProcessor : public Processor {
   std::vector<HitAndTag> hitAndTagVec;
   
   /*--------------------Global parameters--------------------*/
-  int _nActiveLayers;
   int numElements;
   LCCollection * col;
   std::string _prefixPlotName;
-  int _nPixelsPerLayer;
-  /*------------------------------------------------------------------------------*/
+  bool _pauseAfterDraw;
+  /*---------------------------------------------------------*/
+
+
+  /*--------------------Algorithms setting parameter structure--------------------*/
+  caloobject::GeomParameterSetting m_CaloGeomSetting;
+  /*--------------------------------------------------------------------------------*/
 
   /*--------------------Algorithms list to initialise--------------------*/
   algorithm::Cluster *algo_Cluster;
@@ -96,7 +101,7 @@ class hgcalDisplayProcessor : public Processor {
   algorithm::Tracking *algo_Tracking;
   algorithm::InteractionFinder *algo_InteractionFinder;
   algorithm::Hough *algo_Hough;
-  /*------------------------------------------------------------------------------*/
+  /*---------------------------------------------------------------------*/
   
   /*--------------------Algorithms setting parameter structure--------------------*/
    algorithm::clusterParameterSetting m_ClusterParameterSetting; 
