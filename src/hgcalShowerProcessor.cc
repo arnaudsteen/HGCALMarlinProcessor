@@ -195,7 +195,7 @@ void hgcalShowerProcessor::init()
 
 void hgcalShowerProcessor::DoShower()
 {
-  std::vector<caloobject::CaloCluster*> clusters;
+  std::vector<caloobject::CaloCluster2D*> clusters;
   
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
     algo_Cluster->Run(it->second,clusters);
@@ -228,7 +228,7 @@ void hgcalShowerProcessor::DoShower()
   
   outTree->Fill();
   delete shower;
-  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
+  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
   clusters.clear();
 

@@ -54,7 +54,7 @@ class hgcalEfficiencyProcessor : public Processor {
   virtual void end() ;
 
   void AlgorithmRegistrationParameters(); 
-  void LayerProperties(std::vector<caloobject::CaloCluster*> &clusters);
+  void LayerProperties(std::vector<caloobject::CaloCluster2D*> &clusters);
   void clearVec();
   void DoTracking();
  protected:

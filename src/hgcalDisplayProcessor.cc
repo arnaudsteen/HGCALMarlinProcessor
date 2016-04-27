@@ -341,13 +341,13 @@ void hgcalDisplayProcessor::drawHistos()
 
 void hgcalDisplayProcessor::DoHough()
 {
-  std::vector<caloobject::CaloCluster*> clusters;
+  std::vector<caloobject::CaloCluster2D*> clusters;
   
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
     algo_Cluster->Run(it->second,clusters);
   }
   std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
-  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
+  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
     if(algo_ClusteringHelper->IsIsolatedCluster(*it,clusters)){
       delete *it; 
       clusters.erase(it); 
@@ -365,7 +365,7 @@ void hgcalDisplayProcessor::DoHough()
   std::cout << "number of created tracks = " << tracks.size() << std::endl;
   for(std::vector<HitAndTag>::iterator it=hitAndTagVec.begin(); it!=hitAndTagVec.end(); ++it)
     for( std::vector<caloobject::CaloTrack*>::iterator jt=tracks.begin(); jt!=tracks.end(); ++jt)
-      for( std::vector<caloobject::CaloCluster*>::const_iterator kt=(*jt)->getClusters().begin(); kt!=(*jt)->getClusters().end(); ++kt){
+      for( std::vector<caloobject::CaloCluster2D*>::const_iterator kt=(*jt)->getClusters().begin(); kt!=(*jt)->getClusters().end(); ++kt){
 	if( (*kt)->getLayerID()!=(*it).hit->getCellID()[2] ) continue;
 	for(std::vector<caloobject::CaloHit*>::iterator lt=(*kt)->getHits().begin(); lt!=(*kt)->getHits().end(); ++lt)
 	  if( (*it).hit==(*lt) ){
@@ -373,7 +373,7 @@ void hgcalDisplayProcessor::DoHough()
 	  }
       }
   
-  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
+  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
   clusters.clear();
   for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
@@ -408,6 +408,7 @@ void hgcalDisplayProcessor::processEvent( LCEvent * evt )
       for (int j=0; j < numElements; ++j) {
 	CalorimeterHit * hit = dynamic_cast<CalorimeterHit*>( col->getElementAt( j ) ) ;
 	CLHEP::Hep3Vector vec(hit->getPosition()[0],hit->getPosition()[1],hit->getPosition()[2]);
+	//	std::cout << "vec.z() = " << vec.z() << " " << hit->getPosition()[2] << std::endl;
 	int cellID[]={IDdecoder(hit)["I"],IDdecoder(hit)["J"],IDdecoder(hit)["K-1"]};
 	caloobject::CaloHit *aHit=new caloobject::CaloHit(cellID,vec,hit->getEnergy(),hit->getTime(),posShift);
 	hitMap[cellID[2]].push_back(aHit);

@@ -236,12 +236,12 @@ void hgcalEfficiencyProcessor::processRunHeader( LCRunHeader* run)
 
 void hgcalEfficiencyProcessor::DoTracking()
 {
-  std::vector<caloobject::CaloCluster*> clusters;
+  std::vector<caloobject::CaloCluster2D*> clusters;
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
     algo_Cluster->Run(it->second,clusters);
   }
   std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
-  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
+  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
     if(algo_ClusteringHelper->IsIsolatedCluster(*it,clusters)){
       delete *it; 
       clusters.erase(it); 
@@ -269,11 +269,11 @@ void hgcalEfficiencyProcessor::DoTracking()
   tree->Fill();
 
   delete track;
-  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
+  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
 }
 
-void hgcalEfficiencyProcessor::LayerProperties(std::vector<caloobject::CaloCluster*> &clusters)
+void hgcalEfficiencyProcessor::LayerProperties(std::vector<caloobject::CaloCluster2D*> &clusters)
 {
   int trackBegin= (*clusters.begin())->getLayerID();
   int trackEnd=(*(clusters.end()-1))->getLayerID();

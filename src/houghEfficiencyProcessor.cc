@@ -231,13 +231,13 @@ void houghEfficiencyProcessor::init()
 
 void houghEfficiencyProcessor::DoHough()
 {
-  std::vector<caloobject::CaloCluster*> clusters;
+  std::vector<caloobject::CaloCluster2D*> clusters;
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
     algo_Cluster->Run(it->second,clusters);
   }
   std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
   clusterEnergy.clear();
-  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
+  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
     clusterEnergy.push_back( (*it)->getEnergy() );
     if(algo_ClusteringHelper->IsIsolatedCluster(*it,clusters)){
       delete *it; 
@@ -249,7 +249,7 @@ void houghEfficiencyProcessor::DoHough()
   algo_Hough->runHough(clusters,tracks,algo_Tracking);
 
   fillHistograms(tracks);
-  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
+  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
   clusters.clear();
   for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
