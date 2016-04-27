@@ -7,11 +7,15 @@
 #include <cstring>
 #include <EVENT/CalorimeterHit.h>
 #include <vector>
+#include <map>
 
 #include "CaloObject/CaloHit.h"
 #include "CaloObject/CaloGeom.h"
 #include "CaloObject/Shower.h"
 #include "Algorithm/ShowerAnalyser.h"
+#include "Algorithm/InteractionFinder.h"
+#include "Algorithm/Cluster.h"
+#include "Algorithm/ClusteringHelper.h"
 
 #include <TFile.h>
 #include <TTree.h>
@@ -61,7 +65,7 @@ class hgcalShowerProcessor : public Processor {
   std::vector<std::string> _hgcalCollections;
 
  private:
-  std::vector<caloobject::CaloHit*> hitVec;
+  std::map<int, std::vector<caloobject::CaloHit*> > hitMap;
   
   /*--------------------Global parameters--------------------*/
   int numElements;
@@ -75,10 +79,16 @@ class hgcalShowerProcessor : public Processor {
 
   /*--------------------Algorithms list to initialise--------------------*/
   algorithm::ShowerAnalyser *algo_ShowerAnalyser;
+  algorithm::InteractionFinder *algo_InteractionFinder;
+  algorithm::Cluster *algo_Cluster;
+  algorithm::ClusteringHelper *algo_ClusteringHelper;
   /*------------------------------------------------------------------------------*/
   
   /*--------------------Algorithms setting parameter structure--------------------*/
-  algorithm::ShowerAnalyserParameterSetting m_ShowerAnalyserSetting; 
+  algorithm::ShowerAnalyserParameterSetting m_ShowerAnalyserSetting;
+  algorithm::InteractionFinderParameterSetting m_InteractionFinderSetting;
+  algorithm::clusterParameterSetting m_ClusterParameterSetting; 
+  algorithm::ClusteringHelperParameterSetting m_ClusteringHelperParameterSetting; 
   /*------------------------------------------------------------------------------*/
     
   /*--------------------Root output object--------------------*/
@@ -96,7 +106,15 @@ class hgcalShowerProcessor : public Processor {
   float f1; //edep in 10 first layers/total edep
   float showerMax; //x0 unit
   float edepAtMax;
-  std::vector<double> edepPerCell;   
+  float beginX;
+  float beginY;
+  float beginZ;
+  bool findInteraction;
+  std::vector<double> edepPerCell;
+  std::vector<double> longitudinal;
+  std::vector<double> transverse;
+  std::vector<double> distanceToAxis;
+  std::vector<double> clustersEnergy;   
 } ;
 
 #endif

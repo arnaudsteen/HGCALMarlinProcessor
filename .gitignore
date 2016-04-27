@@ -1,8 +1,11 @@
 *.slcio
 *.root
 *.xml
+*~
 build/
 lib/
+script/*~
 src/*~
 include/*~
 to-do
+displays/*

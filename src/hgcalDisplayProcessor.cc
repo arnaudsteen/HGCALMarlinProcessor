@@ -175,6 +175,16 @@ hgcalDisplayProcessor::hgcalDisplayProcessor() : Processor("hgcalDisplayProcesso
     			      m_HoughParameterSetting.padSize,
     			      (float) 10.0 );
 
+  registerProcessorParameter( "Hough::UseAnalogEnergy" ,
+    			      "Set true to use 2D cluster deposited energy in active detectors (true for hgcal; false for sdhcal); default value=false",
+    			      m_HoughParameterSetting.useAnalogEnergy,
+    			      (bool) true );
+  
+  registerProcessorParameter( "Hough::MaxEnergy" ,
+    			      "Maximum deposited energy in GeV in 2D cluster for mip candidate; default value = 1 MeV",
+    			      m_HoughParameterSetting.maxEnergy,
+    			      (float) 0.001 );
+
   registerProcessorParameter( "Hough::PrintDebug" ,
     			      "If true, Hough algorithm will print some debug information",
     			      m_HoughParameterSetting.printDebug,

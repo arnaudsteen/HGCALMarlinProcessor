@@ -112,6 +112,7 @@ class houghEfficiencyProcessor : public Processor {
    float eta; 
    float theta; 
 
+   std::vector<double> clusterEnergy;
    std::vector<double> gunPosition; 
    std::vector<double> gunMomentum; 
 } ;

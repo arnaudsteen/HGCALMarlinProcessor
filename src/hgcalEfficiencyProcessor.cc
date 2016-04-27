@@ -255,7 +255,8 @@ void hgcalEfficiencyProcessor::DoTracking()
     _trackX0=track->getTrackStartingCluster()->getPosition().x();
     _trackY0=track->getTrackStartingCluster()->getPosition().y();
     _trackZ0=track->getTrackStartingCluster()->getPosition().z();
-    if( algo_InteractionFinder->Run(clusters,track->getTrackParameters())==false ){
+    algo_InteractionFinder->Run(clusters,track->getTrackParameters());
+    if( algo_InteractionFinder->FindInteraction()==false ){
       _transverseRatio=algo_Tracking->getTransverseRatio();
       _eventChi2=track->getChi2();
       CLHEP::Hep3Vector nx(-1.,0.,track->getTrackParameters()[1]);

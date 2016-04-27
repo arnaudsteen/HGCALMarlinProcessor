@@ -59,6 +59,9 @@ cat > LCIO.xml <<EOF
   <parameter name="Geometry::Geometry::PixelSize" type="int"> 10.0 </parameter>
   <parameter name="Hough::NThetas" type="int"> 50 </parameter>
   <parameter name="Hough::MinimumNBins" type="int"> 6 </parameter>
+  <parameter name="Hough::UseAnalogEnergy" type="bool"> true </parameter>
+  <parameter name="Hough::MaxEnergy" type="float"> 0.00035 </parameter>
+  <parameter name="Hough::MaximumNumberOfNeighboursForMip" type="int"> 2 </parameter>
  </processor>
 </marlin>
 

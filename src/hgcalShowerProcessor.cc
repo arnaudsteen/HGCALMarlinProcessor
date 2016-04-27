@@ -47,6 +47,38 @@ hgcalShowerProcessor::hgcalShowerProcessor() : Processor("hgcalShowerProcessor")
  			      m_CaloGeomSetting.pixelSize,
  			      (float) 10.0 ); 
   /*--------------------------------------------*/
+  
+  /*------------algorithm::InteractionFinder-----------*/
+  registerProcessorParameter( "InteractionFinder::MinSize" ,
+    			      "Minimum cluster size for to define an interaction point",
+    			      m_InteractionFinderSetting.minSize,
+    			      (int) 4 ); 
+
+  registerProcessorParameter( "InteractionFinder::MaxRadius" ,
+    			      "Maximum transversal distance to look for clusters",
+    			      m_InteractionFinderSetting.maxRadius,
+    			      (float) 50.0 ); 
+
+  registerProcessorParameter( "InteractionFinder::MaxDepth" ,
+    			      "Maximum depth (number of layers) to look for clusters",
+    			      m_InteractionFinderSetting.maxDepth,
+    			      (int) 4 ); 
+
+  registerProcessorParameter( "InteractionFinder::MinNumberOfCluster" ,
+    			      "Minimum number of found clusters (big enough) after the interaction point",
+    			      m_InteractionFinderSetting.minNumberOfCluster,
+    			      (int) 3 );
+  
+  registerProcessorParameter( "InteractionFinder::UseAnalogEnergy" ,
+    			      "set true to use cluster energy rather than topology (siwcal)",
+    			      m_InteractionFinderSetting.useAnalogEnergy,
+    			      (bool) true );
+
+  registerProcessorParameter( "InteractionFinder::MinEnergy" ,
+    			      "minimum cluster energy to define interaction, default value corresponds to 1 MeV",
+    			      m_InteractionFinderSetting.minEnergy,
+    			      (float) 0.001 );  
+  /*---------------------------------------------------*/
 
   /*------------algorithm::ShowerAnalyser------------*/
   registerProcessorParameter( "ShowerAnalyser::EnergyCalibrationOption" ,
@@ -60,12 +92,52 @@ hgcalShowerProcessor::hgcalShowerProcessor() : Processor("hgcalShowerProcessor")
  			      (int) 10 );
 
   std::vector<float> vec;
-  vec.push_back(1.0);
+  vec.push_back(1.10325471172506013e+02);
   registerProcessorParameter( "ShowerAnalyser::EnergyCalibrationFactors" ,
  			      "Calibration factors to reconstruct the shower energy",
  			      m_ShowerAnalyserSetting.energyCalibrationFactors,
  			      vec );
   /*-------------------------------------------------*/
+
+  /*------------algorithm::Cluster------------*/
+  registerProcessorParameter( "MaxTransversalCellID" ,
+ 			      "Maximum difference between two hits cellID (0 and 1) to build a cluster",
+ 			      m_ClusterParameterSetting.maxTransversal,
+ 			      (int) 1 ); 
+
+  registerProcessorParameter( "MaxLongitudinalCellID" ,
+ 			      "Maximum difference between two hits cellID (2) to build a cluster",
+ 			      m_ClusterParameterSetting.maxLongitudinal,
+ 			      (int) 0 ); 
+
+  registerProcessorParameter( "UseDistanceInsteadCellID" ,
+ 			      "Boolean to know if clustering algorithms uses distance instead of cellID to cluster hits together",
+ 			      m_ClusterParameterSetting.useDistanceInsteadCellID,
+ 			      (bool) false ); 
+
+  registerProcessorParameter( "MaxTransversalDistance" ,
+ 			      "Maximum transversal distance (in mm) between two hits to gathered them in one cluster",
+ 			      m_ClusterParameterSetting.maxTransversalDistance,
+ 			      (float) 11.0 ); 
+
+  registerProcessorParameter( "MaxLongitudinalDistance" ,
+ 			      "Maximum longitudinal distance (in mm) between two hits to gathered them in one cluster",
+ 			      m_ClusterParameterSetting.maxLongitudinalDistance,
+ 			      (float) 27.0 ); 
+  /*------------------------------------------*/
+
+  /*------------algorithm::ClusteringHelper------------*/
+  registerProcessorParameter( "LongitudinalDistanceForIsolation" ,
+    			      "Minimum longitudinal distance (in mm) between one hits and its neighbours to decide if it is isolated",
+    			      m_ClusteringHelperParameterSetting.longitudinalDistance,
+    			      (float) 100.0 ); 
+
+  registerProcessorParameter( "TranversalDistanceForIsolation" ,
+    			      "Minimum transversal distance (in mm) between one hits and its neighbours to decide if it is isolated",
+    			      m_ClusteringHelperParameterSetting.transversalDistance,
+    			      (float) 200.0 ); 
+  /*---------------------------------------------------*/
+
 }
 
 
@@ -77,8 +149,18 @@ void hgcalShowerProcessor::init()
   _nEvt = 0 ;
 
   /*--------------------Algorithms initialisation--------------------*/
+  m_ShowerAnalyserSetting.interactionFinderParams = m_InteractionFinderSetting;
   algo_ShowerAnalyser=new algorithm::ShowerAnalyser();
   algo_ShowerAnalyser->SetShowerAnalyserParameterSetting(m_ShowerAnalyserSetting);
+  
+  algo_InteractionFinder=new algorithm::InteractionFinder();
+  algo_InteractionFinder->SetInteractionFinderParameterSetting(m_InteractionFinderSetting);
+
+  algo_Cluster=new algorithm::Cluster();
+  algo_Cluster->SetClusterParameterSetting(m_ClusterParameterSetting);
+
+  algo_ClusteringHelper=new algorithm::ClusteringHelper();
+  algo_ClusteringHelper->SetClusteringHelperParameterSetting(m_ClusteringHelperParameterSetting);
   
   std::ostringstream os( std::ostringstream::ate );
   os.str(_outName);
@@ -98,6 +180,14 @@ void hgcalShowerProcessor::init()
   outTree->Branch("showerMax",&showerMax);
   outTree->Branch("edepAtMax",&edepAtMax);
   outTree->Branch("edepPerCell","std::vector<double>",&edepPerCell);
+  outTree->Branch("beginX",&beginX);
+  outTree->Branch("beginY",&beginY);
+  outTree->Branch("beginZ",&beginZ);
+  outTree->Branch("findInteraction",&findInteraction);
+  outTree->Branch("longitudinal","std::vector<double>",&longitudinal);
+  outTree->Branch("transverse","std::vector<double>",&transverse);
+  outTree->Branch("distanceToAxis","std::vector<double>",&distanceToAxis);
+  outTree->Branch("clustersEnergy","std::vector<double>",&clustersEnergy);
 
 }
 
@@ -105,11 +195,18 @@ void hgcalShowerProcessor::init()
 
 void hgcalShowerProcessor::DoShower()
 {
-  caloobject::Shower* shower=new caloobject::Shower(hitVec);
+  std::vector<caloobject::CaloCluster*> clusters;
+  
+  for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
+    algo_Cluster->Run(it->second,clusters);
+  }
+  std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
+
+  caloobject::Shower* shower=new caloobject::Shower(clusters);
   algo_ShowerAnalyser->Run(shower);
 
   energy=shower->getEnergy();
-  edep=shower->getEdep();
+  edep=shower->getEdep()*1000;
   nlayer=shower->getNlayer();
   reconstructedCosTheta=shower->getReconstructedCosTheta();
   transverseRatio=shower->getTransverseRatio();
@@ -117,11 +214,24 @@ void hgcalShowerProcessor::DoShower()
   phi=shower->getPhi();
   f1=shower->getF1();
   showerMax=shower->getShowerMax();
-  edepAtMax=shower->getEdepAtMax();
+  edepAtMax=shower->getEdepAtMax()*1000;
   edepPerCell=shower->getEdepPerCell();
-
+  beginX=shower->getStartingPosition().x();
+  beginY=shower->getStartingPosition().y();
+  beginZ=shower->getStartingPosition().z();
+  findInteraction=shower->findInteraction();
+  longitudinal=shower->getLongitudinal();
+  transverse=shower->getTransverse();
+  distanceToAxis=shower->getDistancesToAxis();
+  clustersEnergy=shower->getClustersEnergy();
+  //*1000 -> MeV unit
+  
   outTree->Fill();
   delete shower;
+  for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
+    delete (*it);
+  clusters.clear();
+
 }
 
 /*---------------------------------------------------------------------------*/
@@ -151,7 +261,7 @@ void hgcalShowerProcessor::processEvent( LCEvent * evt )
 	CLHEP::Hep3Vector vec(hit->getPosition()[0],hit->getPosition()[1],hit->getPosition()[2]);
 	int cellID[]={IDdecoder(hit)["I"],IDdecoder(hit)["J"],IDdecoder(hit)["K-1"]};
 	caloobject::CaloHit *aHit=new caloobject::CaloHit(cellID,vec,hit->getEnergy(),hit->getTime(),posShift);
-	hitVec.push_back(aHit);
+	hitMap[cellID[2]].push_back(aHit);
       }
       DoShower();
       clearVec();
@@ -166,10 +276,11 @@ void hgcalShowerProcessor::processEvent( LCEvent * evt )
 
 void hgcalShowerProcessor::clearVec()
 {
-  for(std::vector<caloobject::CaloHit*>::iterator it=hitVec.begin(); it!=hitVec.end(); ++it)
-    delete (*it);
+  for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it)
+    for( std::vector<caloobject::CaloHit*>::iterator jt=(it->second).begin(); jt!=(it->second).end(); ++jt)
+      delete *(jt);
 
-  hitVec.clear();
+  hitMap.clear();
 }
 
 
@@ -182,4 +293,7 @@ void hgcalShowerProcessor::end(){
   outFile->Write();
   outFile->Close();
   delete algo_ShowerAnalyser;
+  delete algo_InteractionFinder;
+  delete algo_Cluster;
+  delete algo_ClusteringHelper;
 }

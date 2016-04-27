@@ -217,6 +217,7 @@ void houghEfficiencyProcessor::init()
   outTree->Branch("cosTheta",&cosTheta);
   outTree->Branch("eta",&eta);
   outTree->Branch("theta",&theta);
+  outTree->Branch("clusterEnergy","std::vector<double>",&clusterEnergy);
   
   hDistance=new TH1D("hDistance","Distance",100,0,50);
   hEfficiency=new TH1D("hEfficiency","Efficiency",100,0,2);
@@ -235,19 +236,19 @@ void houghEfficiencyProcessor::DoHough()
     algo_Cluster->Run(it->second,clusters);
   }
   std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
+  clusterEnergy.clear();
   for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
+    clusterEnergy.push_back( (*it)->getEnergy() );
     if(algo_ClusteringHelper->IsIsolatedCluster(*it,clusters)){
       delete *it; 
       clusters.erase(it); 
       it--;
     }
   }
-  
   std::vector< caloobject::CaloTrack* > tracks;
   algo_Hough->runHough(clusters,tracks,algo_Tracking);
 
   fillHistograms(tracks);
-  
   for(std::vector<caloobject::CaloCluster*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
   clusters.clear();
