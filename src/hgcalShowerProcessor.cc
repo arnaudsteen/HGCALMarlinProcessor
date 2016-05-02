@@ -46,7 +46,27 @@ hgcalShowerProcessor::hgcalShowerProcessor() : Processor("hgcalShowerProcessor")
  			      "Pixel size (assume square pixels)",
  			      m_CaloGeomSetting.pixelSize,
  			      (float) 10.0 ); 
-  /*--------------------------------------------*/
+
+  registerProcessorParameter( "ShowerAnalyser::FirstSectionLastLayer" ,
+ 			      "Number of layer to define the end of first calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 10 );
+
+  registerProcessorParameter( "ShowerAnalyser::SecondSectionLastLayer" ,
+ 			      "Number of layer to define the end of second calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 20 );
+  
+  registerProcessorParameter( "ShowerAnalyser::ThirdSectionLastLayer" ,
+			      "Number of layer to define the end of third calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 30 );
+  
+  registerProcessorParameter( "ShowerAnalyser::FourthSectionLastLayer" ,
+ 			      "Number of layer to define the end of fourth calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 40 );
+/*--------------------------------------------*/
   
   /*------------algorithm::InteractionFinder-----------*/
   registerProcessorParameter( "InteractionFinder::MinSize" ,
@@ -86,11 +106,6 @@ hgcalShowerProcessor::hgcalShowerProcessor() : Processor("hgcalShowerProcessor")
  			      m_ShowerAnalyserSetting.energyCalibrationOption,
  			      std::string("SiWEcal") );
   
-  registerProcessorParameter( "ShowerAnalyser::FirstSectionLastLayer" ,
- 			      "Number of layer to define the end of first calorimeter section",
- 			      m_ShowerAnalyserSetting.firstSectionLastLayer,
- 			      (int) 10 );
-
   std::vector<float> vec;
   vec.push_back(1.10325471172506013e+02);
   registerProcessorParameter( "ShowerAnalyser::EnergyCalibrationFactors" ,
@@ -171,12 +186,17 @@ void hgcalShowerProcessor::init()
 
   outTree->Branch("energy",&energy);
   outTree->Branch("edep",&edep);
+  outTree->Branch("meanEdep",&meanEdep);
+  outTree->Branch("rmsEdep",&rmsEdep);
   outTree->Branch("nlayer",&nlayer);
   outTree->Branch("reconstructedCosTheta",&reconstructedCosTheta);
   outTree->Branch("transverseRatio",&transverseRatio);
   outTree->Branch("eta",&eta);
   outTree->Branch("phi",&phi);
   outTree->Branch("f1",&f1);
+  outTree->Branch("f2",&f2);
+  outTree->Branch("f3",&f3);
+  outTree->Branch("f4",&f4);
   outTree->Branch("showerMax",&showerMax);
   outTree->Branch("edepAtMax",&edepAtMax);
   outTree->Branch("edepPerCell","std::vector<double>",&edepPerCell);
@@ -207,12 +227,17 @@ void hgcalShowerProcessor::DoShower()
 
   energy=shower->getEnergy();
   edep=shower->getEdep()*1000;
+  meanEdep=shower->getMeanEdep()*1000;
+  rmsEdep=shower->getRMSEdep()*1000;
   nlayer=shower->getNlayer();
   reconstructedCosTheta=shower->getReconstructedCosTheta();
   transverseRatio=shower->getTransverseRatio();
   eta=shower->getEta();
   phi=shower->getPhi();
   f1=shower->getF1();
+  f2=shower->getF2();
+  f3=shower->getF3();
+  f4=shower->getF4();
   showerMax=shower->getShowerMax();
   edepAtMax=shower->getEdepAtMax()*1000;
   edepPerCell=shower->getEdepPerCell();

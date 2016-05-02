@@ -31,7 +31,7 @@ echo "list : "$list
 cat > LCIO.xml <<EOF
 <marlin>
  <execute>
-  <processor name="hgcalDisplayProcessor"/>
+  <processor name="testClusteringProcessor"/>
  </execute>
  
  <global>
@@ -39,7 +39,7 @@ cat > LCIO.xml <<EOF
    ${path}/${file}
   </parameter>
   <!-- limit the number of processed records (run+evt): -->  
-  <parameter name="MaxRecordNumber" value="100"/>  
+  <parameter name="MaxRecordNumber" value="10"/>  
   <!--parameter name="SkipNEvents" value="18000" /-->  
   <parameter name="SupressCheck" value="false" />  
   <!--parameter name="GearXMLFile"> gear_ldc.xml </parameter-->  
@@ -47,21 +47,17 @@ cat > LCIO.xml <<EOF
   <!--parameter name="RandomSeed" value="1234567890" /-->
  </global>
  
- <processor name="hgcalDisplayProcessor" type="hgcalDisplayProcessor">
-  <!--hgcalDisplayProcessor calculates a HGCAL display and pad multiplcity for each SHDCAL layer-->
+ <processor name="testClusteringProcessor" type="testClusteringProcessor">
+  <!--testClusteringProcessor displays events in HGCAL-->
   <!--Name of the CalorimeterHit collection-->
   <parameter name="CollectionName" type="string" lcioInType="CalorimeterHit"> HGCALCalorimeterHit </parameter>
   <!--Name of the root output file-->
   <parameter name="PrefixPlotName" type="int"> ${prefix} </parameter>
   <parameter name="PauseAfterDraw" type="bool"> false </parameter>
   <parameter name="Geometry::NLayers" type="int"> 28 </parameter>
-  <parameter name="Geometry::NPixelsPerLayer" type="int"> 64 </parameter>
+  <parameter name="Geometry::NPixelsPerLayer" type="int"> 128 </parameter>
   <parameter name="Geometry::Geometry::PixelSize" type="int"> 10.0 </parameter>
-  <parameter name="Hough::NThetas" type="int"> 50 </parameter>
-  <parameter name="Hough::MinimumNBins" type="int"> 6 </parameter>
-  <parameter name="Hough::UseAnalogEnergy" type="bool"> true </parameter>
-  <parameter name="Hough::MaxEnergy" type="float"> 0.00035 </parameter>
-  <parameter name="Hough::MaximumNumberOfNeighboursForMip" type="int"> 2 </parameter>
+  <parameter name="Geometry::Geometry::FirstLayerZ" type="float"> -144.15 </parameter>
  </processor>
 </marlin>
 

@@ -97,6 +97,8 @@ class hgcalShowerProcessor : public Processor {
 
   float energy;
   float edep;
+  float meanEdep;
+  float rmsEdep;
   int nlayer;
   float reconstructedCosTheta;
   float transverseRatio;
@@ -104,6 +106,9 @@ class hgcalShowerProcessor : public Processor {
   float phi;
     
   float f1; //edep in 10 first layers/total edep
+  float f2; //edep in 20 first layers/total edep
+  float f3; //edep in 30 first layers/total edep
+  float f4; //edep in 40 first layers/total edep
   float showerMax; //x0 unit
   float edepAtMax;
   float beginX;

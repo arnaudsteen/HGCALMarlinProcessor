@@ -1,7 +1,7 @@
 import os
 
-particle="e-"	
-energy=[1,2,3,5,10,15,20,25,30]
+particle="pi-"	
+energy=[ i*10 for i in range(1,4)]
 seed=0
 
 for i in range(0,len(energy)):
