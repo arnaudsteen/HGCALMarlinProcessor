@@ -119,7 +119,8 @@ class hgcalShowerProcessor : public Processor {
   std::vector<double> longitudinal;
   std::vector<double> transverse;
   std::vector<double> distanceToAxis;
-  std::vector<double> clustersEnergy;   
+  std::vector<double> clustersEnergy;
+  std::vector<double> hitTimes;   
 } ;
 
 #endif

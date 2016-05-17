@@ -208,6 +208,7 @@ void hgcalShowerProcessor::init()
   outTree->Branch("transverse","std::vector<double>",&transverse);
   outTree->Branch("distanceToAxis","std::vector<double>",&distanceToAxis);
   outTree->Branch("clustersEnergy","std::vector<double>",&clustersEnergy);
+  outTree->Branch("hitTimes","std::vector<double>",&hitTimes);
 
 }
 
@@ -249,6 +250,7 @@ void hgcalShowerProcessor::DoShower()
   transverse=shower->getTransverse();
   distanceToAxis=shower->getDistancesToAxis();
   clustersEnergy=shower->getClustersEnergy();
+  hitTimes=shower->getHitTimes();
   //*1000 -> MeV unit
   
   outTree->Fill();
@@ -286,8 +288,10 @@ void hgcalShowerProcessor::processEvent( LCEvent * evt )
 	CLHEP::Hep3Vector vec(hit->getPosition()[0],hit->getPosition()[1],hit->getPosition()[2]);
 	int cellID[]={IDdecoder(hit)["I"],IDdecoder(hit)["J"],IDdecoder(hit)["K-1"]};
 	caloobject::CaloHit *aHit=new caloobject::CaloHit(cellID,vec,hit->getEnergy(),hit->getTime(),posShift);
+	std::cout << aHit->getTime() << ", ";
 	hitMap[cellID[2]].push_back(aHit);
       }
+      std::cout << std::endl;
       DoShower();
       clearVec();
     }
