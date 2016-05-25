@@ -1,5 +1,5 @@
-#ifndef houghEfficiencyProcessor_h
-#define houghEfficiencyProcessor_h 1
+#ifndef fsrStudyProcessor_h
+#define fsrStudyProcessor_h 1
 
 #include "marlin/Processor.h"
 #include "lcio.h"
@@ -11,11 +11,14 @@
 
 #include "CaloObject/CaloHit.h"
 #include "CaloObject/CaloGeom.h"
-#include "Algorithm/Cluster.h"
-#include "Algorithm/Tracking.h"
-#include "Algorithm/ClusteringHelper.h"
+#include "CaloObject/Shower.h"
+#include "Algorithm/ShowerAnalyser.h"
 #include "Algorithm/InteractionFinder.h"
+#include "Algorithm/Cluster.h"
+#include "Algorithm/ClusteringHelper.h"
 #include "Algorithm/Hough.h"
+#include "Algorithm/Tracking.h"
+#include "Algorithm/Distance.h"
 
 #include <TFile.h>
 #include <TTree.h>
@@ -24,14 +27,14 @@
 using namespace lcio ;
 using namespace marlin ;
 
-class houghEfficiencyProcessor : public Processor {
+class fsrStudyProcessor : public Processor {
   
  public:
 
-  virtual Processor*  newProcessor() { return new houghEfficiencyProcessor ; }
+  virtual Processor*  newProcessor() { return new fsrStudyProcessor ; }
   
   
-  houghEfficiencyProcessor() ;
+  fsrStudyProcessor() ;
   
   /** Called at the begin of the job before anything is read.
    * Use to initialize the processor, e.g. book histograms.
@@ -54,8 +57,8 @@ class houghEfficiencyProcessor : public Processor {
    */
   virtual void end() ;
 
-  void DoHough(); 
-  void fillHistograms(std::vector<caloobject::CaloTrack*> &tracks);
+  void DoShower();
+  void DoHough(std::vector<caloobject::CaloCluster2D*> &clusters); 
   void clearVec();
  protected:
 
@@ -66,58 +69,76 @@ class houghEfficiencyProcessor : public Processor {
   std::vector<std::string> _hgcalCollections;
 
  private:
-  std::map<int,std::vector<caloobject::CaloHit*> > hitMap;
+  std::map<int, std::vector<caloobject::CaloHit*> > hitMap;
   
   /*--------------------Global parameters--------------------*/
   int numElements;
   LCCollection * col;
   std::string _outName;
-  float _efficiencyDistance;
+  float _minDistanceToVertex;
   /*------------------------------------------------------------------------------*/
 
-  /*--------------------Algorithms setting parameter structure--------------------*/
+  /*--------------------CaloObjects setting parameter structure--------------------*/
   caloobject::GeomParameterSetting m_CaloGeomSetting;
   /*------------------------------------------------------------------------------*/
 
   /*--------------------Algorithms list to initialise--------------------*/
+  algorithm::ShowerAnalyser *algo_ShowerAnalyser;
+  algorithm::InteractionFinder *algo_InteractionFinder;
   algorithm::Cluster *algo_Cluster;
   algorithm::ClusteringHelper *algo_ClusteringHelper;
   algorithm::Tracking *algo_Tracking;
-  algorithm::InteractionFinder *algo_InteractionFinder;
   algorithm::Hough *algo_Hough;
   /*------------------------------------------------------------------------------*/
   
   /*--------------------Algorithms setting parameter structure--------------------*/
+  algorithm::ShowerAnalyserParameterSetting m_ShowerAnalyserSetting;
+  algorithm::InteractionFinderParameterSetting m_InteractionFinderSetting;
   algorithm::clusterParameterSetting m_ClusterParameterSetting; 
-  algorithm::ClusteringHelperParameterSetting m_ClusteringHelperParameterSetting; 
+  algorithm::ClusteringHelperParameterSetting m_ClusteringHelperParameterSetting;
+  algorithm::HoughParameterSetting m_HoughParameterSetting;
   algorithm::TrackingParameterSetting m_TrackingParameterSetting; 
-  algorithm::InteractionFinderParameterSetting m_InteractionFinderParameterSetting; 
-  algorithm::HoughParameterSetting m_HoughParameterSetting; 
   /*------------------------------------------------------------------------------*/
     
   /*--------------------Root output object--------------------*/
   TFile *outFile; 
   TTree* outTree;
 
-  TH1D* hDistance;
-  TH1D* hEfficiency;
-  TH1D* hCosThetaSim;
-  TH1D* hCosThetaRec;
-  TH1D* hNtrack;
-   
-  float noiseRate; 
-  float distanceToVertex;
-  float distanceToProjection;
-  int ntrack; 
-  float cosTheta; 
-  float eta; 
-  float theta; 
+  float energy;
+  float edep;
+  float meanEdep;
+  float rmsEdep;
+  int nlayer;
+  float reconstructedCosTheta;
+  float transverseRatio;
+  float eta;
+  float phi;
+    
+  float f1; //edep in 10 first layers/total edep
+  float f2; //edep in 20 first layers/total edep
+  float f3; //edep in 30 first layers/total edep
+  float f4; //edep in 40 first layers/total edep
+  float showerMax; //x0 unit
+  float edepAtMax;
+  float beginX;
+  float beginY;
+  float beginZ;
+  bool findInteraction;
+  std::vector<double> edepPerCell;
+  std::vector<double> longitudinal;
+  std::vector<double> transverse;
+  std::vector<double> distanceToAxis;
+  std::vector<double> clustersEnergy;
+  std::vector<double> hitTimes;   
 
-  std::vector<double> clusterEnergy;
-  std::vector<double> gunPosition;
-  std::vector<double> gunProjection; 
-  std::vector<double> gunMomentum; 
+  float distanceToVertex; 
+  int ntrack; 
+  float muonCosTheta; 
+
+  std::vector<double> muonClusterEnergy;
+  std::vector<double> muonGunPosition; 
+  std::vector<double> muonGunMomentum; 
+
 } ;
 
 #endif
-

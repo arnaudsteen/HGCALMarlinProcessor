@@ -35,6 +35,10 @@ cat > LCIO.xml <<EOF
   <parameter name="OutputName" type="string" > single_${particle}_${energy}GeV_${seed}.root </parameter>
   <!--Number of steps to loop over theta values-->
   <parameter name="Hough::NThetas" type="int"> 50 </parameter>
+  <parameter name="Hough::MinimumNBins" type="int"> 6 </parameter>
+  <parameter name="Hough::UseAnalogEnergy" type="bool"> true </parameter>
+  <parameter name="Hough::MaxEnergy" type="float"> 0.0005 </parameter>
+  <parameter name="Hough::MaximumNumberOfNeighboursForMip" type="int"> 2 </parameter>
  </processor>
 
 </marlin>

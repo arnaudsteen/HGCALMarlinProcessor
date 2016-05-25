@@ -1,7 +1,5 @@
-#include "houghEfficiencyProcessor.h"
+#include "fsrStudyProcessor.h"
 #include <iostream>
-#include <time.h>
-#include <algorithm>
 
 #include <EVENT/LCCollection.h>
 #include <EVENT/LCParameters.h>
@@ -9,16 +7,15 @@
 
 // ----- include for verbosity dependend logging ---------
 #include "marlin/VerbosityLevels.h"
-#include <string.h>
 using namespace lcio ;
 using namespace marlin ;
 
-houghEfficiencyProcessor ahoughEfficiencyProcessor ;
+fsrStudyProcessor afsrStudyProcessor ;
 
-houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficiencyProcessor") {
+fsrStudyProcessor::fsrStudyProcessor() : Processor("fsrStudyProcessor") {
 
   // modify processor description
-  _description = "houghEfficiencyProcessor displays events in HGCAL" ;
+  _description = "fsrStudyProcessor displays events in HGCAL" ;
   
   
   std::vector<std::string> hgcalCollections;
@@ -34,29 +31,94 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
 			      _outName ,
 			      std::string("toto.root") );
 
-  registerProcessorParameter( "EfficiencyDistance" ,
-			      "Maximum distance between track expected projection and gun position" ,
-			      _efficiencyDistance,
-			      (float)15.0 );
+  registerProcessorParameter( "MinDistanceToVertex" ,
+			      "Minum distance (in mm) to vertex to consider reconstructed track as inpiut muon" ,
+			      _minDistanceToVertex ,
+			      (float) 15.0);
 
   /*------------caloobject::CaloGeom------------*/
   registerProcessorParameter( "Geometry::NLayers" ,
  			      "Number of layers",
  			      m_CaloGeomSetting.nLayers,
  			      (int) 28 ); 
+
   registerProcessorParameter( "Geometry::NPixelsPerLayer" ,
  			      "Number of pixels per layer (assume square geometry)",
  			      m_CaloGeomSetting.nPixelsPerLayer,
  			      (int) 64 ); 
+
   registerProcessorParameter( "Geometry::PixelSize" ,
  			      "Pixel size (assume square pixels)",
  			      m_CaloGeomSetting.pixelSize,
  			      (float) 10.0 ); 
-  registerProcessorParameter( "Geometry::FirstLayerZ" ,
- 			      "Z position of the first calorimeter layer",
- 			      m_CaloGeomSetting.firstLayerZ,
- 			      (float) -144.15); 
+
+  registerProcessorParameter( "Geometry::FirstSectionLastLayer" ,
+ 			      "Number of layer to define the end of first calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 10 );
+
+  registerProcessorParameter( "Geometry::SecondSectionLastLayer" ,
+ 			      "Number of layer to define the end of second calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 20 );
+  
+  registerProcessorParameter( "Geometry::ThirdSectionLastLayer" ,
+			      "Number of layer to define the end of third calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 30 );
+  
+  registerProcessorParameter( "Geometry::FourthSectionLastLayer" ,
+ 			      "Number of layer to define the end of fourth calorimeter section",
+ 			      m_CaloGeomSetting.firstSectionLastLayer,
+ 			      (int) 40 );
   /*--------------------------------------------*/
+  
+  /*------------algorithm::InteractionFinder-----------*/
+  registerProcessorParameter( "InteractionFinder::MinSize" ,
+    			      "Minimum cluster size for to define an interaction point",
+    			      m_InteractionFinderSetting.minSize,
+    			      (int) 4 ); 
+
+  registerProcessorParameter( "InteractionFinder::MaxRadius" ,
+    			      "Maximum transversal distance to look for clusters",
+    			      m_InteractionFinderSetting.maxRadius,
+    			      (float) 50.0 ); 
+
+  registerProcessorParameter( "InteractionFinder::MaxDepth" ,
+    			      "Maximum depth (number of layers) to look for clusters",
+    			      m_InteractionFinderSetting.maxDepth,
+    			      (int) 4 ); 
+
+  registerProcessorParameter( "InteractionFinder::MinNumberOfCluster" ,
+    			      "Minimum number of found clusters (big enough) after the interaction point",
+    			      m_InteractionFinderSetting.minNumberOfCluster,
+    			      (int) 3 );
+  
+  registerProcessorParameter( "InteractionFinder::UseAnalogEnergy" ,
+    			      "set true to use cluster energy rather than topology (siwcal)",
+    			      m_InteractionFinderSetting.useAnalogEnergy,
+    			      (bool) true );
+
+  registerProcessorParameter( "InteractionFinder::MinEnergy" ,
+    			      "minimum cluster energy to define interaction, default value corresponds to 1 MeV",
+    			      m_InteractionFinderSetting.minEnergy,
+    			      (float) 0.001 );  
+  /*---------------------------------------------------*/
+
+  /*------------algorithm::ShowerAnalyser------------*/
+  registerProcessorParameter( "ShowerAnalyser::EnergyCalibrationOption" ,
+ 			      "Option to set energy calibration method",
+ 			      m_ShowerAnalyserSetting.energyCalibrationOption,
+ 			      std::string("SiWEcal") );
+  
+  std::vector<float> vec;
+  vec.push_back(1.10325471172506013e+02);
+  registerProcessorParameter( "ShowerAnalyser::EnergyCalibrationFactors" ,
+ 			      "Calibration factors to reconstruct the shower energy",
+ 			      m_ShowerAnalyserSetting.energyCalibrationFactors,
+ 			      vec );
+
+  /*-------------------------------------------------*/
 
   /*------------algorithm::Cluster------------*/
   registerProcessorParameter( "MaxTransversalCellID" ,
@@ -83,6 +145,7 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
  			      "Maximum longitudinal distance (in mm) between two hits to gathered them in one cluster",
  			      m_ClusterParameterSetting.maxLongitudinalDistance,
  			      (float) 27.0 ); 
+  /*------------------------------------------*/
 
   /*------------algorithm::ClusteringHelper------------*/
   registerProcessorParameter( "LongitudinalDistanceForIsolation" ,
@@ -94,6 +157,7 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
     			      "Minimum transversal distance (in mm) between one hits and its neighbours to decide if it is isolated",
     			      m_ClusteringHelperParameterSetting.transversalDistance,
     			      (float) 200.0 ); 
+  /*---------------------------------------------------*/
 
   /*------------algorithm::Tracking-----------*/
   registerProcessorParameter( "Tracking::ChiSquareLimit" ,
@@ -114,28 +178,8 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
   registerProcessorParameter( "Tracking::CosThetaLimit",
     			      "minimum value for cos theta to keep the track",
     			      m_TrackingParameterSetting.cosThetaLimit,
-    			      (float) 0.0 ); 
-
-  /*------------algorithm::InteractionFinder-----------*/
-  registerProcessorParameter( "InteractionFinder::MinSize" ,
-    			      "Minimum cluster size for to define an interaction point",
-    			      m_InteractionFinderParameterSetting.minSize,
-    			      (int) 4 ); 
-
-  registerProcessorParameter( "InteractionFinder::MaxRadius" ,
-    			      "Maximum transversal distance to look for clusters",
-    			      m_InteractionFinderParameterSetting.maxRadius,
-    			      (float) 50.0 ); 
-
-  registerProcessorParameter( "InteractionFinder::MaxDepth" ,
-    			      "Maximum depth (number of layers) to look for clusters",
-    			      m_InteractionFinderParameterSetting.maxDepth,
-    			      (int) 4 ); 
-
-  registerProcessorParameter( "InteractionFinder::MinNumberOfCluster" ,
-    			      "Minimum number of found clusters (big enough) after the interaction point",
-    			      m_InteractionFinderParameterSetting.minNumberOfCluster,
-    			      (int) 3 ); 
+    			      (float) 0.0 );
+  /*------------------------------------------*/
 
   /*------------algorithm::Hough-----------*/
   registerProcessorParameter( "Hough::NThetas" ,
@@ -192,21 +236,28 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
     			      "If true, Hough algorithm will print some debug information",
     			      m_HoughParameterSetting.printDebug,
     			      (bool) false );
+  /*---------------------------------------*/
+  
+
 }
 
 
-void houghEfficiencyProcessor::init()
+void fsrStudyProcessor::init()
 { 
   printParameters() ;
 
   _nRun = 0 ;
   _nEvt = 0 ;
 
-  /*--------------------Geomttry initialisation--------------------*/
-  m_HoughParameterSetting.geometry=m_CaloGeomSetting;
-  /*---------------------------------------------------------------*/
-
   /*--------------------Algorithms initialisation--------------------*/
+  m_ShowerAnalyserSetting.geometry=m_CaloGeomSetting;
+  m_ShowerAnalyserSetting.interactionFinderParams = m_InteractionFinderSetting;
+  algo_ShowerAnalyser=new algorithm::ShowerAnalyser();
+  algo_ShowerAnalyser->SetShowerAnalyserParameterSetting(m_ShowerAnalyserSetting);
+      
+  algo_InteractionFinder=new algorithm::InteractionFinder();
+  algo_InteractionFinder->SetInteractionFinderParameterSetting(m_InteractionFinderSetting);
+
   algo_Cluster=new algorithm::Cluster();
   algo_Cluster->SetClusterParameterSetting(m_ClusterParameterSetting);
 
@@ -216,9 +267,7 @@ void houghEfficiencyProcessor::init()
   algo_Tracking=new algorithm::Tracking();
   algo_Tracking->SetTrackingParameterSetting(m_TrackingParameterSetting);
 
-  algo_InteractionFinder=new algorithm::InteractionFinder();
-  algo_InteractionFinder->SetInteractionFinderParameterSetting(m_InteractionFinderParameterSetting);
-
+  m_HoughParameterSetting.geometry=m_CaloGeomSetting;
   algo_Hough=new algorithm::Hough();
   algo_Hough->SetHoughParameterSetting(m_HoughParameterSetting);
 
@@ -227,107 +276,139 @@ void houghEfficiencyProcessor::init()
   if( os.str().find(std::string(".root"))>os.str().size() )
     os << std::string(".root");
   outFile=new TFile(os.str().c_str(),"RECREATE");
-  outTree = new TTree("tree","Hough efficiency tree");
-  outTree->Branch("noiseRate",&noiseRate);
-  outTree->Branch("gunPosition","std::vector<double>",&gunPosition);
-  outTree->Branch("gunMomentum","std::vector<double>",&gunMomentum);
-  outTree->Branch("distanceToVertex",&distanceToVertex);
-  outTree->Branch("distanceToProjection",&distanceToProjection);
-  outTree->Branch("ntrack",&ntrack);
-  outTree->Branch("cosTheta",&cosTheta);
+  outTree = new TTree("tree","FSR study processor tree");
+
+  outTree->Branch("energy",&energy);
+  outTree->Branch("edep",&edep);
+  outTree->Branch("meanEdep",&meanEdep);
+  outTree->Branch("rmsEdep",&rmsEdep);
+  outTree->Branch("nlayer",&nlayer);
+  outTree->Branch("reconstructedCosTheta",&reconstructedCosTheta);
+  outTree->Branch("transverseRatio",&transverseRatio);
   outTree->Branch("eta",&eta);
-  outTree->Branch("theta",&theta);
-  outTree->Branch("clusterEnergy","std::vector<double>",&clusterEnergy);
-  
-  hDistance=new TH1D("hDistance","Distance",100,0,50);
-  hEfficiency=new TH1D("hEfficiency","Efficiency",100,0,2);
-  hCosThetaSim=new TH1D("hCosThetaSim","CosThetaSim",100,0,1.1);
-  hCosThetaRec=new TH1D("hCosThetaRec","CosThetaRec",100,0,1.1);
-  hNtrack=new TH1D("hNtrack","Ntrack",100,0,10);
+  outTree->Branch("phi",&phi);
+  outTree->Branch("f1",&f1);
+  outTree->Branch("f2",&f2);
+  outTree->Branch("f3",&f3);
+  outTree->Branch("f4",&f4);
+  outTree->Branch("showerMax",&showerMax);
+  outTree->Branch("edepAtMax",&edepAtMax);
+  outTree->Branch("edepPerCell","std::vector<double>",&edepPerCell);
+  outTree->Branch("beginX",&beginX);
+  outTree->Branch("beginY",&beginY);
+  outTree->Branch("beginZ",&beginZ);
+  outTree->Branch("findInteraction",&findInteraction);
+  outTree->Branch("longitudinal","std::vector<double>",&longitudinal);
+  outTree->Branch("transverse","std::vector<double>",&transverse);
+  outTree->Branch("distanceToAxis","std::vector<double>",&distanceToAxis);
+  outTree->Branch("clustersEnergy","std::vector<double>",&clustersEnergy);
+  outTree->Branch("hitTimes","std::vector<double>",&hitTimes);
+
+  outTree->Branch("muonGunPosition","std::vector<double>",&muonGunPosition);
+  outTree->Branch("muonGunMomentum","std::vector<double>",&muonGunMomentum);
+  outTree->Branch("muonClusterEnergy","std::vector<double>",&muonClusterEnergy);
+  outTree->Branch("distanceToVertex",&distanceToVertex);
+  outTree->Branch("ntrack",&ntrack);
+  outTree->Branch("muonCosTheta",&muonCosTheta);
 
 }
 
 /*---------------------------------------------------------------------------*/
 
-void houghEfficiencyProcessor::DoHough()
+void fsrStudyProcessor::DoHough(std::vector<caloobject::CaloCluster2D*> &clusters)
+{
+  std::vector< caloobject::CaloTrack* > tracks;
+  algo_Hough->runHough(clusters,tracks,algo_Tracking);
+  muonClusterEnergy.clear();
+  CLHEP::Hep3Vector gunPos(muonGunPosition.at(0),
+   			   muonGunPosition.at(1),
+   			   muonGunPosition.at(2));
+  algorithm::Distance<CLHEP::Hep3Vector,float> dist;
+  distanceToVertex=std::numeric_limits<float>::max();
+  muonCosTheta=-1;
+  ntrack=tracks.size();
+
+  if( ntrack>0 ){
+    std::vector<caloobject::CaloTrack*>::iterator bestTrackIt;
+    for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
+      float dist=(float)(gunPos-(*it)->expectedTrackProjection(gunPos.z())).mag() ;
+      if( dist<distanceToVertex ){
+	distanceToVertex=dist;
+	muonCosTheta=(*it)->getCosTheta();
+	bestTrackIt=it;
+      }
+    }
+    if( distanceToVertex<_minDistanceToVertex )
+      for(std::vector<caloobject::CaloCluster2D*>::iterator jt=(*bestTrackIt)->getClusters().begin(); jt!=(*bestTrackIt)->getClusters().end(); ++jt){
+	muonClusterEnergy.push_back( (*jt)->getEnergy() );
+	if( std::find(clusters.begin(),clusters.end(),(*jt))!=clusters.end() ){
+	  clusters.erase( std::find(clusters.begin(),clusters.end(),(*jt)) );
+	  delete (*jt);
+	}
+      }
+  }
+  for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)    
+    delete (*it);
+  tracks.clear();
+}
+
+void fsrStudyProcessor::DoShower()
 {
   std::vector<caloobject::CaloCluster2D*> clusters;
+  
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
     algo_Cluster->Run(it->second,clusters);
   }
   std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
-  clusterEnergy.clear();
-  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
-    clusterEnergy.push_back( (*it)->getEnergy() );
-    if(algo_ClusteringHelper->IsIsolatedCluster(*it,clusters)){
-      delete *it; 
-      clusters.erase(it); 
-      it--;
-    }
-  }
-  std::vector< caloobject::CaloTrack* > tracks;
-  algo_Hough->runHough(clusters,tracks,algo_Tracking);
 
-  fillHistograms(tracks);
+  DoHough(clusters);
+  
+  caloobject::Shower* shower=new caloobject::Shower(clusters);
+  algo_ShowerAnalyser->Run(shower);
+
+  energy=shower->getEnergy();
+  edep=shower->getEdep()*1000;
+  meanEdep=shower->getMeanEdep()*1000;
+  rmsEdep=shower->getRMSEdep()*1000;
+  nlayer=shower->getNlayer();
+  reconstructedCosTheta=shower->getReconstructedCosTheta();
+  transverseRatio=shower->getTransverseRatio();
+  eta=shower->getEta();
+  phi=shower->getPhi();
+  f1=shower->getF1();
+  f2=shower->getF2();
+  f3=shower->getF3();
+  f4=shower->getF4();
+  showerMax=shower->getShowerMax();
+  edepAtMax=shower->getEdepAtMax()*1000;
+  edepPerCell=shower->getEdepPerCell();
+  beginX=shower->getStartingPosition().x();
+  beginY=shower->getStartingPosition().y();
+  beginZ=shower->getStartingPosition().z();
+  findInteraction=shower->findInteraction();
+  longitudinal=shower->getLongitudinal();
+  transverse=shower->getTransverse();
+  distanceToAxis=shower->getDistancesToAxis();
+  clustersEnergy=shower->getClustersEnergy();
+  hitTimes=shower->getHitTimes();
+  //*1000 -> MeV unit
+  
+  outTree->Fill();
+  delete shower;
   for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
   clusters.clear();
-  for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
-    delete (*it);
-  tracks.clear();
-  
 }
 
 /*---------------------------------------------------------------------------*/
 
-void houghEfficiencyProcessor::fillHistograms(std::vector<caloobject::CaloTrack*> &tracks)
-{
-  CLHEP::Hep3Vector gunPos(gunPosition.at(0),
-			   gunPosition.at(1),
-			   gunPosition.at(2));
-  CLHEP::Hep3Vector gunProj(gunProjection.at(0),
-			    gunProjection.at(1),
-			    gunProjection.at(2));
-  algorithm::Distance<CLHEP::Hep3Vector,float> dist;
-  float minDist=std::numeric_limits<float>::max();
-  cosTheta=-1;
-  for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
-    float dist=(float)(gunProj-(*it)->expectedTrackProjection(gunProj.z())).mag() ;
-    if( dist<minDist ){
-      minDist=dist;
-      cosTheta=(*it)->getCosTheta();
-      eta=(*it)->orientationVector().eta();
-      theta=(*it)->orientationVector().theta();
-      distanceToProjection=(float)(gunProj-(*it)->expectedTrackProjection(gunProj.z())).mag() ;
-      distanceToVertex=(float)(gunPos-(*it)->expectedTrackProjection(gunPos.z())).mag() ;
-    }
-  }
-  
-  hDistance->Fill(minDist);
-  if(minDist<_efficiencyDistance)
-    hEfficiency->Fill(1);
-  else
-    hEfficiency->Fill(0);
-  
-  hCosThetaRec->Fill(cosTheta);
-
-  CLHEP::Hep3Vector gunMom(gunMomentum.at(0),
-			   gunMomentum.at(1),
-			   gunMomentum.at(2));
-  hCosThetaSim->Fill(gunMom.cosTheta());
-  hNtrack->Fill(tracks.size());
-  ntrack=tracks.size();
-}
-
-/*---------------------------------------------------------------------------*/
-
-  void houghEfficiencyProcessor::processRunHeader( LCRunHeader* run)
+void fsrStudyProcessor::processRunHeader( LCRunHeader* run)
 {
   _nRun++ ;
   _nEvt = 0;
 } 
 
-void houghEfficiencyProcessor::processEvent( LCEvent * evt )
+void fsrStudyProcessor::processEvent( LCEvent * evt )
 {   
   //
   // * Reading HGCAL Collections of CalorimeterHits* 
@@ -336,17 +417,12 @@ void houghEfficiencyProcessor::processEvent( LCEvent * evt )
   UTIL::CellIDDecoder<EVENT::CalorimeterHit> IDdecoder("M:3,S-1:3,I:9,J:9,K-1:6");
   
   std::vector<float> vecP;evt->parameters().getFloatVals(std::string("GunPosition"),vecP);
-  std::vector<float> vecM;evt->parameters().getFloatVals(std::string("ParticleMomentum"),vecM);
-
-  float coeff= ( m_CaloGeomSetting.firstLayerZ - vecP.at(2) )/vecM.at(2);
-
-  noiseRate=evt->getParameters().getFloatVal(std::string("noiseRate"));
+  std::vector<float> vecM;evt->parameters().getFloatVals(std::string("particleMomentum_0"),vecM);
   for(int i=0; i<3; i++){
-    gunPosition.push_back( vecP.at(i) );
-    gunMomentum.push_back( vecM.at(i) );
-    gunProjection.push_back( vecP.at(i) + coeff*vecM.at(i) );
+    muonGunPosition.push_back(vecP.at(i));
+    muonGunMomentum.push_back(vecM.at(i));
   }
-    
+
   for (unsigned int i(0); i < _hgcalCollections.size(); ++i) {
     std::string colName =  _hgcalCollections[i] ;
     try{
@@ -360,8 +436,7 @@ void houghEfficiencyProcessor::processEvent( LCEvent * evt )
 	caloobject::CaloHit *aHit=new caloobject::CaloHit(cellID,vec,hit->getEnergy(),hit->getTime(),posShift);
 	hitMap[cellID[2]].push_back(aHit);
       }
-      DoHough();
-      outTree->Fill();
+      DoShower();
       clearVec();
     }
     catch(DataNotAvailableException &e){ 
@@ -372,29 +447,28 @@ void houghEfficiencyProcessor::processEvent( LCEvent * evt )
   std::cout << "Event processed : " << _nEvt << std::endl;
 }
 
-void houghEfficiencyProcessor::clearVec()
+void fsrStudyProcessor::clearVec()
 {
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it)
     for( std::vector<caloobject::CaloHit*>::iterator jt=(it->second).begin(); jt!=(it->second).end(); ++jt)
       delete *(jt);
 
   hitMap.clear();
-  gunPosition.clear();
-  gunMomentum.clear();
-  gunProjection.clear();
 }
 
 
-void houghEfficiencyProcessor::check( LCEvent * evt ) { 
+void fsrStudyProcessor::check( LCEvent * evt ) { 
   // nothing to check here - could be used to fill checkplots in reconstruction processor
 }
 
 
-void houghEfficiencyProcessor::end(){ 
+void fsrStudyProcessor::end(){ 
   outFile->Write();
   outFile->Close();
+  delete algo_ShowerAnalyser;
+  delete algo_InteractionFinder;
   delete algo_Cluster;
   delete algo_ClusteringHelper;
+  delete algo_Hough;
   delete algo_Tracking;
-  delete algo_InteractionFinder;
 }
