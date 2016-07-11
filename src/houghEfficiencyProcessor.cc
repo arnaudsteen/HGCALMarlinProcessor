@@ -173,11 +173,6 @@ houghEfficiencyProcessor::houghEfficiencyProcessor() : Processor("houghEfficienc
     			      m_HoughParameterSetting.isolationDistance,
     			      (int) 2 );
 
-  registerProcessorParameter( "Hough::PadSize" ,
-    			      "Transversal pad (pixel) size (assuming square geometry)",
-    			      m_HoughParameterSetting.padSize,
-    			      (float) 10.0 );
-
   registerProcessorParameter( "Hough::UseAnalogEnergy" ,
     			      "Set true to use 2D cluster deposited energy in active detectors (true for hgcal; false for sdhcal); default value=false",
     			      m_HoughParameterSetting.useAnalogEnergy,
@@ -219,6 +214,7 @@ void houghEfficiencyProcessor::init()
   algo_InteractionFinder=new algorithm::InteractionFinder();
   algo_InteractionFinder->SetInteractionFinderParameterSetting(m_InteractionFinderParameterSetting);
 
+  m_HoughParameterSetting.geometry=m_CaloGeomSetting;
   algo_Hough=new algorithm::Hough();
   algo_Hough->SetHoughParameterSetting(m_HoughParameterSetting);
 

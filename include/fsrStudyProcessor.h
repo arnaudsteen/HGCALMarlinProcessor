@@ -19,6 +19,8 @@
 #include "Algorithm/Hough.h"
 #include "Algorithm/Tracking.h"
 #include "Algorithm/Distance.h"
+#include "Algorithm/Cluster3D.h"
+#include "Algorithm/CalohitHelper.h"
 
 #include <TFile.h>
 #include <TTree.h>
@@ -58,7 +60,7 @@ class fsrStudyProcessor : public Processor {
   virtual void end() ;
 
   void DoShower();
-  void DoHough(std::vector<caloobject::CaloCluster2D*> &clusters); 
+  void DoHough(std::vector<caloobject::CaloCluster2D*> &clusters, caloobject::CaloTrack* &track); 
   void clearVec();
  protected:
 
@@ -75,7 +77,8 @@ class fsrStudyProcessor : public Processor {
   int numElements;
   LCCollection * col;
   std::string _outName;
-  float _minDistanceToVertex;
+  float _minDistanceToProjection;
+  bool _do3DClustering;
   /*------------------------------------------------------------------------------*/
 
   /*--------------------CaloObjects setting parameter structure--------------------*/
@@ -89,6 +92,7 @@ class fsrStudyProcessor : public Processor {
   algorithm::ClusteringHelper *algo_ClusteringHelper;
   algorithm::Tracking *algo_Tracking;
   algorithm::Hough *algo_Hough;
+  algorithm::Cluster3D *algo_Cluster3D;
   /*------------------------------------------------------------------------------*/
   
   /*--------------------Algorithms setting parameter structure--------------------*/
@@ -98,6 +102,7 @@ class fsrStudyProcessor : public Processor {
   algorithm::ClusteringHelperParameterSetting m_ClusteringHelperParameterSetting;
   algorithm::HoughParameterSetting m_HoughParameterSetting;
   algorithm::TrackingParameterSetting m_TrackingParameterSetting; 
+  algorithm::cluster3DParameterSetting m_Cluster3DParameterSetting; 
   /*------------------------------------------------------------------------------*/
     
   /*--------------------Root output object--------------------*/
@@ -131,7 +136,7 @@ class fsrStudyProcessor : public Processor {
   std::vector<double> clustersEnergy;
   std::vector<double> hitTimes;   
 
-  float distanceToVertex; 
+  float distanceToProjection; 
   int ntrack; 
   float muonCosTheta; 
 

@@ -31,10 +31,15 @@ fsrStudyProcessor::fsrStudyProcessor() : Processor("fsrStudyProcessor") {
 			      _outName ,
 			      std::string("toto.root") );
 
-  registerProcessorParameter( "MinDistanceToVertex" ,
-			      "Minum distance (in mm) to vertex to consider reconstructed track as inpiut muon" ,
-			      _minDistanceToVertex ,
+  registerProcessorParameter( "MinDistanceToProjection" ,
+			      "Minimum distance (in mm) to projection to consider reconstructed track as inpiut muon" ,
+			      _minDistanceToProjection ,
 			      (float) 15.0);
+
+  registerProcessorParameter( "Do3DClustering" ,
+			      "boolean to set at true to perform 3D clustering after the hough" ,
+			      _do3DClustering ,
+			      (bool) false);
 
   /*------------caloobject::CaloGeom------------*/
   registerProcessorParameter( "Geometry::NLayers" ,
@@ -51,6 +56,11 @@ fsrStudyProcessor::fsrStudyProcessor() : Processor("fsrStudyProcessor") {
  			      "Pixel size (assume square pixels)",
  			      m_CaloGeomSetting.pixelSize,
  			      (float) 10.0 ); 
+
+  registerProcessorParameter( "Geometry::FirstLayerZ" ,
+ 			      "Z position of the first calorimeter layer",
+ 			      m_CaloGeomSetting.firstLayerZ,
+ 			      (float) -144.15); 
 
   registerProcessorParameter( "Geometry::FirstSectionLastLayer" ,
  			      "Number of layer to define the end of first calorimeter section",
@@ -217,11 +227,6 @@ fsrStudyProcessor::fsrStudyProcessor() : Processor("fsrStudyProcessor") {
     			      m_HoughParameterSetting.isolationDistance,
     			      (int) 2 );
 
-  registerProcessorParameter( "Hough::PadSize" ,
-    			      "Transversal pad (pixel) size (assuming square geometry)",
-    			      m_HoughParameterSetting.padSize,
-    			      (float) 10.0 );
-
   registerProcessorParameter( "Hough::UseAnalogEnergy" ,
     			      "Set true to use 2D cluster deposited energy in active detectors (true for hgcal; false for sdhcal); default value=false",
     			      m_HoughParameterSetting.useAnalogEnergy,
@@ -238,6 +243,17 @@ fsrStudyProcessor::fsrStudyProcessor() : Processor("fsrStudyProcessor") {
     			      (bool) false );
   /*---------------------------------------*/
   
+  /*------------algorithm::Cluster3D------------*/
+  registerProcessorParameter( "Cluster3D::MaxLongitudinal" ,
+ 			      "Maximum difference between two hits cellID (2) to build a cluster",
+ 			      m_Cluster3DParameterSetting.maxLongitudinal,
+ 			      (int) 3 ); 
+
+  registerProcessorParameter( "Cluster3D::MaxTransverseDistance" ,
+ 			      "Maximum transverse distance (in mm) between two hits to gathered them in one cluster",
+ 			      m_Cluster3DParameterSetting.maxTransverseDistance,
+ 			      (float) 30.0 ); 
+  /*--------------------------------------------*/
 
 }
 
@@ -270,6 +286,10 @@ void fsrStudyProcessor::init()
   m_HoughParameterSetting.geometry=m_CaloGeomSetting;
   algo_Hough=new algorithm::Hough();
   algo_Hough->SetHoughParameterSetting(m_HoughParameterSetting);
+
+  m_Cluster3DParameterSetting.geometry=m_CaloGeomSetting;
+  algo_Cluster3D=new algorithm::Cluster3D();
+  algo_Cluster3D->SetCluster3DParameterSetting(m_Cluster3DParameterSetting);
 
   std::ostringstream os( std::ostringstream::ate );
   os.str(_outName);
@@ -307,7 +327,7 @@ void fsrStudyProcessor::init()
   outTree->Branch("muonGunPosition","std::vector<double>",&muonGunPosition);
   outTree->Branch("muonGunMomentum","std::vector<double>",&muonGunMomentum);
   outTree->Branch("muonClusterEnergy","std::vector<double>",&muonClusterEnergy);
-  outTree->Branch("distanceToVertex",&distanceToVertex);
+  outTree->Branch("distanceToProjection",&distanceToProjection);
   outTree->Branch("ntrack",&ntrack);
   outTree->Branch("muonCosTheta",&muonCosTheta);
 
@@ -315,7 +335,7 @@ void fsrStudyProcessor::init()
 
 /*---------------------------------------------------------------------------*/
 
-void fsrStudyProcessor::DoHough(std::vector<caloobject::CaloCluster2D*> &clusters)
+void fsrStudyProcessor::DoHough(std::vector<caloobject::CaloCluster2D*> &clusters, caloobject::CaloTrack* &track)
 {
   std::vector< caloobject::CaloTrack* > tracks;
   algo_Hough->runHough(clusters,tracks,algo_Tracking);
@@ -323,33 +343,39 @@ void fsrStudyProcessor::DoHough(std::vector<caloobject::CaloCluster2D*> &cluster
   CLHEP::Hep3Vector gunPos(muonGunPosition.at(0),
    			   muonGunPosition.at(1),
    			   muonGunPosition.at(2));
+  float coeff= ( m_CaloGeomSetting.firstLayerZ - muonGunPosition.at(2) )/muonGunMomentum.at(2);
+  
+  CLHEP::Hep3Vector gunProj(muonGunPosition.at(0) + coeff*muonGunMomentum.at(0),
+			    muonGunPosition.at(1) + coeff*muonGunMomentum.at(1),
+			    muonGunPosition.at(2) + coeff*muonGunMomentum.at(2));
+  
   algorithm::Distance<CLHEP::Hep3Vector,float> dist;
-  distanceToVertex=std::numeric_limits<float>::max();
+  distanceToProjection=std::numeric_limits<float>::max();
   muonCosTheta=-1;
   ntrack=tracks.size();
 
   if( ntrack>0 ){
     std::vector<caloobject::CaloTrack*>::iterator bestTrackIt;
     for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
-      float dist=(float)(gunPos-(*it)->expectedTrackProjection(gunPos.z())).mag() ;
-      if( dist<distanceToVertex ){
-	distanceToVertex=dist;
+      float dist=(float)(gunProj-(*it)->expectedTrackProjection(gunProj.z())).mag() ;
+      if( dist<distanceToProjection ){
+	distanceToProjection=dist;
 	muonCosTheta=(*it)->getCosTheta();
 	bestTrackIt=it;
       }
     }
-    if( distanceToVertex<_minDistanceToVertex )
-      for(std::vector<caloobject::CaloCluster2D*>::iterator jt=(*bestTrackIt)->getClusters().begin(); jt!=(*bestTrackIt)->getClusters().end(); ++jt){
-	muonClusterEnergy.push_back( (*jt)->getEnergy() );
-	if( std::find(clusters.begin(),clusters.end(),(*jt))!=clusters.end() ){
-	  clusters.erase( std::find(clusters.begin(),clusters.end(),(*jt)) );
-	  delete (*jt);
-	}
-      }
+    if( distanceToProjection < _minDistanceToProjection ){
+      track=(*bestTrackIt);
+      for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
+	if( it != bestTrackIt )
+	  delete (*it);
+    }
+    else 
+      for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
+	if( it != bestTrackIt )
+	  delete (*it);
+    tracks.clear();
   }
-  for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)    
-    delete (*it);
-  tracks.clear();
 }
 
 void fsrStudyProcessor::DoShower()
@@ -361,40 +387,75 @@ void fsrStudyProcessor::DoShower()
   }
   std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
 
-  DoHough(clusters);
+  caloobject::CaloTrack* track = NULL;
+  DoHough(clusters,track);
+   
+  if( NULL != track ){
+    for(std::vector<caloobject::CaloCluster2D*>::iterator it=track->getClusters().begin(); it!=track->getClusters().end(); ++it){
+      muonClusterEnergy.push_back( (*it)->getEnergy() );
+      for(std::vector<caloobject::CaloHit*>::iterator jt=(*it)->getHits().begin(); jt!=(*it)->getHits().end(); ++jt)
+	if( std::find( hitMap[ (*it)->getLayerID() ].begin(), hitMap[ (*it)->getLayerID() ].end(), (*jt) )!= hitMap[ (*it)->getLayerID() ].end() ){
+	  hitMap[ (*it)->getLayerID() ].erase( std::find( hitMap[ (*it)->getLayerID() ].begin(), hitMap[ (*it)->getLayerID() ].end(), (*jt) ) );
+	  delete (*jt);
+	}
+    }
+  }
+  std::vector<caloobject::CaloHit*> hitVec;
+  for(std::map< int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it)
+    hitVec.insert(hitVec.begin(), it->second.begin(), it->second.end() );
   
-  caloobject::Shower* shower=new caloobject::Shower(clusters);
-  algo_ShowerAnalyser->Run(shower);
+  std::sort(hitVec.begin(), hitVec.end(), CalohitHelper::sortByLayer);
 
-  energy=shower->getEnergy();
-  edep=shower->getEdep()*1000;
-  meanEdep=shower->getMeanEdep()*1000;
-  rmsEdep=shower->getRMSEdep()*1000;
-  nlayer=shower->getNlayer();
-  reconstructedCosTheta=shower->getReconstructedCosTheta();
-  transverseRatio=shower->getTransverseRatio();
-  eta=shower->getEta();
-  phi=shower->getPhi();
-  f1=shower->getF1();
-  f2=shower->getF2();
-  f3=shower->getF3();
-  f4=shower->getF4();
-  showerMax=shower->getShowerMax();
-  edepAtMax=shower->getEdepAtMax()*1000;
-  edepPerCell=shower->getEdepPerCell();
-  beginX=shower->getStartingPosition().x();
-  beginY=shower->getStartingPosition().y();
-  beginZ=shower->getStartingPosition().z();
-  findInteraction=shower->findInteraction();
-  longitudinal=shower->getLongitudinal();
-  transverse=shower->getTransverse();
-  distanceToAxis=shower->getDistancesToAxis();
-  clustersEnergy=shower->getClustersEnergy();
-  hitTimes=shower->getHitTimes();
-  //*1000 -> MeV unit
-  
-  outTree->Fill();
-  delete shower;
+  caloobject::Shower* shower=NULL;
+  std::vector<caloobject::CaloCluster3D*> clusters3D;
+  if( _do3DClustering ){
+    if( NULL != track ){
+      algo_Cluster3D->Run( hitVec , clusters3D , track->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ) , track->orientationVector() );
+      if(clusters3D.size()>0){
+	caloobject::CaloCluster3D *cluster3D=(*clusters3D.begin());
+	shower=new caloobject::Shower(cluster3D);
+      }
+    }
+  }
+  else
+    shower=new caloobject::Shower(hitVec);
+
+  if( NULL != shower){
+    algo_ShowerAnalyser->Run(shower);
+    energy=shower->getEnergy();
+    edep=shower->getEdep()*1000;
+    meanEdep=shower->getMeanEdep()*1000;
+    rmsEdep=shower->getRMSEdep()*1000;
+    nlayer=shower->getNlayer();
+    reconstructedCosTheta=shower->getReconstructedCosTheta();
+    transverseRatio=shower->getTransverseRatio();
+    eta=shower->getEta();
+    phi=shower->getPhi();
+    f1=shower->getF1();
+    f2=shower->getF2();
+    f3=shower->getF3();
+    f4=shower->getF4();
+    showerMax=shower->getShowerMax();
+    edepAtMax=shower->getEdepAtMax()*1000;
+    edepPerCell=shower->getEdepPerCell();
+    beginX=shower->getStartingPosition().x();
+    beginY=shower->getStartingPosition().y();
+    beginZ=shower->getStartingPosition().z();
+    findInteraction=shower->findInteraction();
+    longitudinal=shower->getLongitudinal();
+    transverse=shower->getTransverse();
+    distanceToAxis=shower->getDistancesToAxis();
+    clustersEnergy=shower->getClustersEnergy();
+    hitTimes=shower->getHitTimes();
+    //*1000 -> MeV unit
+    
+    outTree->Fill();
+    delete shower;
+  }
+  for( std::vector<caloobject::CaloCluster3D*>::iterator it=clusters3D.begin(); it!=clusters3D.end(); ++it )
+    delete (*it);
+  clusters3D.clear();
+
   for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
   clusters.clear();

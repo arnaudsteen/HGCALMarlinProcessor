@@ -4,8 +4,8 @@
 *~
 build/
 lib/
-script/*~
 src/*~
+script/*
 include/*~
 to-do
 displays/*

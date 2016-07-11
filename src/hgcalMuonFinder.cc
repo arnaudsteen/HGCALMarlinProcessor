@@ -1,13 +1,11 @@
-#include "hgcalDisplayProcessor.h"
+#include "hgcalMuonFinder.h"
 #include <iostream>
 #include <time.h>
+#include <algorithm>
 
 #include <EVENT/LCCollection.h>
 #include <EVENT/LCParameters.h>
 #include <UTIL/CellIDDecoder.h>
-
-#include <TStyle.h>
-#include <TText.h>
 
 // ----- include for verbosity dependend logging ---------
 #include "marlin/VerbosityLevels.h"
@@ -15,12 +13,12 @@
 using namespace lcio ;
 using namespace marlin ;
 
-hgcalDisplayProcessor ahgcalDisplayProcessor ;
+hgcalMuonFinder ahgcalMuonFinder ;
 
-hgcalDisplayProcessor::hgcalDisplayProcessor() : Processor("hgcalDisplayProcessor") {
+hgcalMuonFinder::hgcalMuonFinder() : Processor("hgcalMuonFinder") {
 
   // modify processor description
-  _description = "hgcalDisplayProcessor displays events in HGCAL" ;
+  _description = "hgcalMuonFinder displays events in HGCAL" ;
   
   
   std::vector<std::string> hgcalCollections;
@@ -31,30 +29,35 @@ hgcalDisplayProcessor::hgcalDisplayProcessor() : Processor("hgcalDisplayProcesso
 			    _hgcalCollections  ,
 			    hgcalCollections);
 
-  registerProcessorParameter( "PrefixPlotName" ,
-			      "Prefix name for generated plots" ,
-			      _prefixPlotName ,
-			      std::string("muon") );
+  registerProcessorParameter( "OutputName" ,
+			      "Name of the output root file " ,
+			      outputName ,
+			      std::string("toto.root") );
 
-  registerProcessorParameter( "PauseAfterDraw" ,
-			      "Boolean to set if a pause is wanted after diplaying event (using WaitPrimitive method of TCanvas)" ,
-			      _pauseAfterDraw ,
-			      (bool) false );
-  /*------------caloobject::CaloGeom------------*/
+  registerProcessorParameter( "EfficiencyDistance" ,
+			      "Maximum distance between track expected projection and gun position" ,
+			      efficiencyDistance,
+			      (float)15.0 );
+
+ /*------------caloobject::CaloGeom------------*/
   registerProcessorParameter( "Geometry::NLayers" ,
  			      "Number of layers",
  			      m_CaloGeomSetting.nLayers,
- 			      (int) 28 ); 
+ 			      (int) 40 ); 
   registerProcessorParameter( "Geometry::NPixelsPerLayer" ,
  			      "Number of pixels per layer (assume square geometry)",
  			      m_CaloGeomSetting.nPixelsPerLayer,
- 			      (int) 64 ); 
+ 			      (int) 192 ); 
   registerProcessorParameter( "Geometry::PixelSize" ,
  			      "Pixel size (assume square pixels)",
  			      m_CaloGeomSetting.pixelSize,
  			      (float) 10.0 ); 
+  registerProcessorParameter( "Geometry::FirstLayerZ" ,
+ 			      "Z position of the first calorimeter layer",
+ 			      m_CaloGeomSetting.firstLayerZ,
+ 			      (float) -209.60); 
   /*--------------------------------------------*/
-  
+
   /*------------algorithm::Cluster------------*/
   registerProcessorParameter( "MaxTransversalCellID" ,
  			      "Maximum difference between two hits cellID (0 and 1) to build a cluster",
@@ -187,7 +190,7 @@ hgcalDisplayProcessor::hgcalDisplayProcessor() : Processor("hgcalDisplayProcesso
 }
 
 
-void hgcalDisplayProcessor::init()
+void hgcalMuonFinder::init()
 { 
   printParameters() ;
 
@@ -197,7 +200,7 @@ void hgcalDisplayProcessor::init()
   /*--------------------Geomttry initialisation--------------------*/
   m_HoughParameterSetting.geometry=m_CaloGeomSetting;
   /*---------------------------------------------------------------*/
-  
+
   /*--------------------Algorithms initialisation--------------------*/
   algo_Cluster=new algorithm::Cluster();
   algo_Cluster->SetClusterParameterSetting(m_ClusterParameterSetting);
@@ -214,234 +217,149 @@ void hgcalDisplayProcessor::init()
   m_HoughParameterSetting.geometry=m_CaloGeomSetting;
   algo_Hough=new algorithm::Hough();
   algo_Hough->SetHoughParameterSetting(m_HoughParameterSetting);
-  /*-----------------------------------------------------------------*/
-  gStyle->SetOptStat(0);
-  int argc=0;
-  char* argv=(char*)"";
-  app = new TApplication("toto",&argc,&argv);  std::vector< std::string > canName;
-  canName.push_back( std::string("spaceXZ") );
-  canName.push_back( std::string("houghXZ") );
-  canName.push_back( std::string("spaceYZ") );
-  canName.push_back( std::string("houghYZ") );
-  TCanvas *cc=NULL;
-  for(unsigned int i=0; i<canName.size(); i++){
-    cc=new TCanvas();
-    cc->SetWindowSize(400,400);
-    std::pair< std::string,TCanvas* > p(canName.at(i),cc);
-    canvasMap.insert(p);  
-  }
 
-  std::vector< std::string > histoName;
-  histoName.push_back( std::string("spaceXZ_normal") );
-  histoName.push_back( std::string("spaceYZ_normal") );
-  histoName.push_back( std::string("spaceXZ_track") );
-  histoName.push_back( std::string("spaceYZ_track") );
-  std::vector<int> colorVec;
-  colorVec.push_back(1);
-  colorVec.push_back(1);
-  colorVec.push_back(2);
-  colorVec.push_back(2);
-  /*
-  histoName.push_back( std::string("spaceXZ_mip") );
-  histoName.push_back( std::string("spaceYZ_mip") );
-  histoName.push_back( std::string("spaceXZ_core") );
-  histoName.push_back( std::string("spaceYZ_core") );
-  histoName.push_back( std::string("spaceXZ_track") );
-  histoName.push_back( std::string("spaceYZ_track") );
-  */
-  histoName.push_back( std::string("houghXZ") );
-  histoName.push_back( std::string("houghYZ") );
-  TH2D *h=NULL;
-  for(unsigned int i=0; i<histoName.size(); ++i){
-    if( histoName.at(i).find("space")<histoName.at(i).size() ){
-      h=new TH2D(histoName.at(i).c_str(),"",4*m_CaloGeomSetting.nLayers,0.0,m_CaloGeomSetting.nLayers,4*m_CaloGeomSetting.nPixelsPerLayer,0.0,m_CaloGeomSetting.nPixelsPerLayer);
-      h->SetMarkerStyle(20);
-      h->SetMarkerSize(.5);
-      h->GetXaxis()->SetTitle("layer");
-      if( histoName.at(i).find("X")<histoName.at(i).size() )
-	h->GetYaxis()->SetTitle("X [channel number]");
-      else if( histoName.at(i).find("Y")<histoName.at(i).size() )
-	h->GetYaxis()->SetTitle("Y [channel number]");
-      else{
-	std::cout << "problem in histo name booking --> std::abort()" << std::endl;
-	std::abort();
-      }
-      h->SetMarkerColor(colorVec.at(i));
-    }
-    else if( histoName.at(i).find("hough")<histoName.at(i).size() ){
-      h=new TH2D(histoName.at(i).c_str(),"",100,-M_PI/2,M_PI/2,100,0.0,100.0);
-    }
-    else{
-      std::cout << "problem in histo name booking --> std::abort()" << std::endl;
-      std::abort();
-    }
-    std::pair< std::string,TH2D* > p( histoName.at(i),h );
-    histo2DMap.insert(p);
-  }
+  std::ostringstream os( std::ostringstream::ate );
+  os.str(outputName);
+  if( os.str().find(std::string(".root"))>os.str().size() )
+    os << std::string(".root");
+  outFile=new TFile(os.str().c_str(),"RECREATE");
+  outTree = new TTree("tree","Hough efficiency tree");
+  outTree->Branch("distanceToProjection",&distanceToProjection);
+  outTree->Branch("ntrack",&ntrack);
+  outTree->Branch("eta",&eta);
+  outTree->Branch("phi",&phi);
+  outTree->Branch("simEta",&simEta);
+  outTree->Branch("simPhi",&simPhi);
+  outTree->Branch("muonClusterEnergy","std::vector<double>",&muonClusterEnergy);
+  trackPosition=new TH2D("trackPosition","trackPosition",100,-500,500,100,-500,500);
   
 }
 
 /*---------------------------------------------------------------------------*/
 
-void hgcalDisplayProcessor::resetHisto()
-{
-  for(std::map< std::string,TH2D* >::iterator it=histo2DMap.begin(); it!=histo2DMap.end(); ++it)
-    it->second->Reset();
-}
-
-void hgcalDisplayProcessor::fillSpaceHisto( )
-{
-  for( std::vector<HitAndTag>::iterator it=hitAndTagVec.begin(); it!=hitAndTagVec.end(); ++it ){
-    if( (*it).tag==normal ){
-      histo2DMap[ std::string("spaceXZ_normal") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[0] );
-      histo2DMap[ std::string("spaceYZ_normal") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[1] );
-    }
-    else if( (*it).tag==track ){
-      histo2DMap[ std::string("spaceXZ_track") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[0] );
-      histo2DMap[ std::string("spaceYZ_track") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[1] );
-    }
-  }
-  //std::cout << std::string("spaceXZ_normal") << "\t" << histo2DMap[ std::string("spaceXZ_normal") ]->GetEntries() << std::endl;;
-  //std::cout << std::string("spaceXZ_normal") << "\t" << histo2DMap[ std::string("spaceYZ_normal") ]->GetEntries() << std::endl;;
-  //std::cout << std::string("spaceXZ_track")  << "\t" << histo2DMap[ std::string("spaceXZ_track")  ]->GetEntries() << std::endl;; 
-  //std::cout << std::string("spaceXZ_track")  << "\t" << histo2DMap[ std::string("spaceYZ_track")  ]->GetEntries() << std::endl;;
-  
-}
-
-void hgcalDisplayProcessor::drawHistos()
-{
-  std::ostringstream name (std::ostringstream::ate);
-  name.str("");
-  name << std::string("./displays/") << _prefixPlotName << std::string("_event") << _nEvt << std::string("_zx.png");
-
-  canvasMap[ std::string("spaceXZ") ]->cd();
-  histo2DMap[ std::string("spaceXZ_normal") ]->Draw();
-  histo2DMap[ std::string("spaceXZ_track") ]->Draw("same");
-  canvasMap[ std::string("spaceXZ") ]->Update();
-  canvasMap[ std::string("spaceXZ") ]->SaveAs(name.str().c_str());
-
-  
-  name.str("");
-  name << std::string("./displays/") << _prefixPlotName << std::string("_event") << _nEvt << std::string("_zy.png");
-  canvasMap[ std::string("spaceYZ") ]->cd();
-  histo2DMap[ std::string("spaceYZ_normal") ]->Draw();
-  histo2DMap[ std::string("spaceYZ_track") ]->Draw("same");
-  canvasMap[ std::string("spaceYZ") ]->Update();
-  canvasMap[ std::string("spaceYZ") ]->SaveAs(name.str().c_str());
-  //sleep(3);
-  if(_pauseAfterDraw)
-    canvasMap.begin()->second->WaitPrimitive();
-}
-
-/*---------------------------------------------------------------------------*/
-
-void hgcalDisplayProcessor::DoHough()
+void hgcalMuonFinder::DoHough(std::vector<caloobject::CaloTrack*> &tracks)
 {
   std::vector<caloobject::CaloCluster2D*> clusters;
-  
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
     algo_Cluster->Run(it->second,clusters);
   }
   std::sort(clusters.begin(), clusters.end(), algorithm::ClusteringHelper::SortClusterByLayer);
+  muonClusterEnergy.clear();
   for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it){
+    muonClusterEnergy.push_back( (*it)->getEnergy() );
     if(algo_ClusteringHelper->IsIsolatedCluster(*it,clusters)){
       delete *it; 
       clusters.erase(it); 
       it--;
     }
   }
-  
-  std::vector< caloobject::CaloTrack* > tracks;
-  clock_t start,end;
-  start=clock();
   algo_Hough->runHough(clusters,tracks,algo_Tracking);
-  end=clock();
-  std::cout << "time to perform hough transform = " <<  ((float)end-(float)start)/CLOCKS_PER_SEC*1000 << std::endl;
-
-  std::cout << "number of created tracks = " << tracks.size() << std::endl;
-  for(std::vector<HitAndTag>::iterator it=hitAndTagVec.begin(); it!=hitAndTagVec.end(); ++it)
-    for( std::vector<caloobject::CaloTrack*>::iterator jt=tracks.begin(); jt!=tracks.end(); ++jt)
-      for( std::vector<caloobject::CaloCluster2D*>::const_iterator kt=(*jt)->getClusters().begin(); kt!=(*jt)->getClusters().end(); ++kt){
-	if( (*kt)->getLayerID()!=(*it).hit->getCellID()[2] ) continue;
-	for(std::vector<caloobject::CaloHit*>::iterator lt=(*kt)->getHits().begin(); lt!=(*kt)->getHits().end(); ++lt)
-	  if( (*it).hit==(*lt) ){
-	    (*it).tag=track;
-	  }
-      }
-  
   for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
   clusters.clear();
-  for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
-    delete (*it);
-  tracks.clear();
-  
 }
 
 /*---------------------------------------------------------------------------*/
 
-void hgcalDisplayProcessor::processRunHeader( LCRunHeader* run)
+void hgcalMuonFinder::tryToFindMuon()
+{
+  std::vector<caloobject::CaloTrack*> tracks;
+  DoHough(tracks);
+  ntrack = tracks.size();
+  algorithm::Distance<CLHEP::Hep3Vector,float> dist;
+  float minDist=std::numeric_limits<float>::max();
+  std::vector<caloobject::CaloTrack*>::iterator bestIt;
+  for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
+    float dist = (float)(gunProjection-(*it)->expectedTrackProjection(gunProjection.z())).mag() ;
+    if( dist<minDist ){
+      minDist=dist;
+      eta=(*it)->orientationVector().eta();
+      phi=(*it)->orientationVector().phi();
+      distanceToProjection=dist;
+      bestIt=it;
+    }
+  }
+  simEta=gunMomentum.eta();
+  simPhi=gunMomentum.phi();
+
+  if( ntrack>0 && distanceToProjection<efficiencyDistance )
+    trackPosition->Fill( (*bestIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ).x() ,
+			 (*bestIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ).y() );
+
+  for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
+    delete (*it);
+  tracks.clear(); 
+}
+
+/*---------------------------------------------------------------------------*/
+
+  void hgcalMuonFinder::processRunHeader( LCRunHeader* run)
 {
   _nRun++ ;
   _nEvt = 0;
 } 
 
-void hgcalDisplayProcessor::processEvent( LCEvent * evt )
+void hgcalMuonFinder::processEvent( LCEvent * evt )
 {   
   //
   // * Reading HGCAL Collections of CalorimeterHits* 
   //
-  //std::string initString;
   CLHEP::Hep3Vector posShift(0.,0.,0.);
   UTIL::CellIDDecoder<EVENT::CalorimeterHit> IDdecoder("M:3,S-1:3,I:9,J:9,K-1:6");
+  
+  std::vector<float> vecP;evt->parameters().getFloatVals(std::string("GunPosition"),vecP);
+  std::vector<float> vecM;evt->parameters().getFloatVals(std::string("particleMomentum_0"),vecM);
 
+  float coeff= ( m_CaloGeomSetting.firstLayerZ - vecP.at(2) )/vecM.at(2);
+
+  gunPosition = CLHEP::Hep3Vector( vecP.at(0), vecP.at(1), vecP.at(2) );
+  gunMomentum = CLHEP::Hep3Vector( vecM.at(0), vecM.at(1), vecM.at(2) );
+  gunProjection = CLHEP::Hep3Vector( vecP.at(0) + coeff*vecM.at(0) ,
+				     vecP.at(1) + coeff*vecM.at(1) ,
+				     vecP.at(2) + coeff*vecM.at(2) );
+    
   for (unsigned int i(0); i < _hgcalCollections.size(); ++i) {
     std::string colName =  _hgcalCollections[i] ;
     try{
       col = evt->getCollection( _hgcalCollections[i].c_str() ) ;
       numElements = col->getNumberOfElements();
-      if(numElements<10)continue;
       for (int j=0; j < numElements; ++j) {
 	CalorimeterHit * hit = dynamic_cast<CalorimeterHit*>( col->getElementAt( j ) ) ;
 	CLHEP::Hep3Vector vec(hit->getPosition()[0],hit->getPosition()[1],hit->getPosition()[2]);
-	//	std::cout << "vec.z() = " << vec.z() << " " << hit->getPosition()[2] << std::endl;
 	int cellID[]={IDdecoder(hit)["I"],IDdecoder(hit)["J"],IDdecoder(hit)["K-1"]};
 	caloobject::CaloHit *aHit=new caloobject::CaloHit(cellID,vec,hit->getEnergy(),hit->getTime(),posShift);
 	hitMap[cellID[2]].push_back(aHit);
-	HitAndTag hitAndTag(aHit);
-	hitAndTagVec.push_back(hitAndTag);
       }
-      DoHough();
-      fillSpaceHisto();
-      drawHistos();
-      resetHisto();
+      tryToFindMuon();
+      outTree->Fill();
       clearVec();
     }
     catch(DataNotAvailableException &e){ 
-      std::cout << "Exeption " << std::endl;
+      std::cout << "DataNotAvailableException" << std::endl;
     }
   }
   _nEvt ++ ;
   std::cout << "Event processed : " << _nEvt << std::endl;
 }
 
-void hgcalDisplayProcessor::clearVec()
+void hgcalMuonFinder::clearVec()
 {
   for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it)
     for( std::vector<caloobject::CaloHit*>::iterator jt=(it->second).begin(); jt!=(it->second).end(); ++jt)
       delete *(jt);
 
   hitMap.clear();
-  hitAndTagVec.clear();
 }
 
 
-void hgcalDisplayProcessor::check( LCEvent * evt ) { 
+void hgcalMuonFinder::check( LCEvent * evt ) { 
   // nothing to check here - could be used to fill checkplots in reconstruction processor
 }
 
 
-void hgcalDisplayProcessor::end(){ 
+void hgcalMuonFinder::end(){ 
+  outFile->Write();
+  outFile->Close();
   delete algo_Cluster;
   delete algo_ClusteringHelper;
   delete algo_Tracking;

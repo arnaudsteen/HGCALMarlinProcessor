@@ -36,6 +36,11 @@ testClusteringProcessor::testClusteringProcessor() : Processor("testClusteringPr
 			      _prefixPlotName ,
 			      std::string("muon") );
 
+  registerProcessorParameter( "MinDistanceToProjection" ,
+			      "Minum distance (in mm) to projection to consider reconstructed track as inpiut muon" ,
+			      _minDistanceToProjection ,
+			      (float) 15.0);
+
   registerProcessorParameter( "PauseAfterDraw" ,
 			      "Boolean to set if a pause is wanted after diplaying event (using WaitPrimitive method of TCanvas)" ,
 			      _pauseAfterDraw ,
@@ -175,11 +180,6 @@ testClusteringProcessor::testClusteringProcessor() : Processor("testClusteringPr
     			      m_HoughParameterSetting.isolationDistance,
     			      (int) 2 );
 
-  registerProcessorParameter( "Hough::PadSize" ,
-    			      "Transversal pad (pixel) size (assuming square geometry)",
-    			      m_HoughParameterSetting.padSize,
-    			      (float) 10.0 );
-
   registerProcessorParameter( "Hough::UseAnalogEnergy" ,
     			      "Set true to use 2D cluster deposited energy in active detectors (true for hgcal; false for sdhcal); default value=false",
     			      m_HoughParameterSetting.useAnalogEnergy,
@@ -234,6 +234,7 @@ void testClusteringProcessor::init()
   algo_InteractionFinder=new algorithm::InteractionFinder();
   algo_InteractionFinder->SetInteractionFinderParameterSetting(m_InteractionFinderParameterSetting);
 
+  m_HoughParameterSetting.geometry=m_CaloGeomSetting;
   algo_Hough=new algorithm::Hough();
   algo_Hough->SetHoughParameterSetting(m_HoughParameterSetting);
 
@@ -368,23 +369,52 @@ void testClusteringProcessor::DoClustering()
   
   std::vector< caloobject::CaloTrack* > tracks;
   algo_Hough->runHough(clusters,tracks,algo_Tracking);
+  float coeff= ( m_CaloGeomSetting.firstLayerZ - gunPosition.z() )/gunMomentum.z();
+  CLHEP::Hep3Vector gunProj(gunPosition.x() + coeff*gunMomentum.x(),
+			    gunPosition.y() + coeff*gunMomentum.y(),
+			    gunPosition.z() + coeff*gunMomentum.z());
   
-  for( std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
-    for( std::vector<caloobject::CaloCluster2D*>::const_iterator jt=(*it)->getClusters().begin(); jt!=(*it)->getClusters().end(); ++jt){
-      for(std::vector<caloobject::CaloHit*>::iterator kt=(*jt)->getHits().begin(); kt!=(*jt)->getHits().end(); ++kt){
-	for(std::vector<HitAndTag>::iterator lt=hitAndTagVec.begin(); lt!=hitAndTagVec.end(); ++lt){
-	  if( (*lt).hit==(*kt) ){
-	    (*lt).tag=track;
-	    if( std::find(hitVec.begin(), hitVec.end(), (*lt).hit)!=hitVec.end() )
-	      hitVec.erase( std::find(hitVec.begin(), hitVec.end(), (*lt).hit) );
+  algorithm::Distance<CLHEP::Hep3Vector,float> dist;
+  float distanceToProjection=std::numeric_limits<float>::max();
+  int ntrack=tracks.size();
+
+  CLHEP::Hep3Vector trackProj=gunPosition;
+  CLHEP::Hep3Vector trackMom( gunMomentum.x() ,
+			      gunMomentum.y() ,
+			      gunMomentum.z() );
+    
+  if( ntrack>0 ){
+    std::vector<caloobject::CaloTrack*>::iterator bestTrackIt;
+    for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
+      float dist=(float)(gunProj-(*it)->expectedTrackProjection(gunProj.z())).mag() ;
+      if( dist<distanceToProjection ){
+	distanceToProjection=dist;
+	bestTrackIt=it;
+      }
+    }
+    if( distanceToProjection<_minDistanceToProjection ){
+      trackProj = (*bestTrackIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ) ;
+      trackMom = (*bestTrackIt)->orientationVector() ;
+      for(std::vector<caloobject::CaloCluster2D*>::iterator jt=(*bestTrackIt)->getClusters().begin(); jt!=(*bestTrackIt)->getClusters().end(); ++jt){
+	for(std::vector<caloobject::CaloHit*>::iterator kt=(*jt)->getHits().begin(); kt!=(*jt)->getHits().end(); ++kt){
+	  for(std::vector<HitAndTag>::iterator lt=hitAndTagVec.begin(); lt!=hitAndTagVec.end(); ++lt){
+	    if( (*lt).hit==(*kt) ){
+	      (*lt).tag=track;
+	      if( std::find(hitVec.begin(), hitVec.end(), (*lt).hit)!=hitVec.end() )
+		hitVec.erase( std::find(hitVec.begin(), hitVec.end(), (*lt).hit) );
+	    }
 	  }
 	}
+	//if( std::find(clusters.begin(),clusters.end(),(*jt))!=clusters.end() ){
+	//  clusters.erase( std::find(clusters.begin(),clusters.end(),(*jt)) );
+	//  delete (*jt);
+	//}
       }
     }
   }
   
   std::vector<caloobject::CaloCluster3D*> clusters3D;
-  algo_Cluster3D->Run(hitVec,clusters3D,gunPosition,gunMomentum);
+  algo_Cluster3D->Run(hitVec,clusters3D,trackProj,trackMom);
 
   if(clusters3D.size()!=0){
     std::vector<caloobject::CaloCluster3D*>::iterator clit=clusters3D.begin();
@@ -402,17 +432,8 @@ void testClusteringProcessor::DoClustering()
     delete (*it);
   clusters3D.clear();
 
-  std::cout << "before sorting cluster \t";
-  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
-    std::cout << (*it)->getHits().size() << "";
-  std::cout << std::endl;
-
   algorithm::SortClusterBySize<caloobject::CaloCluster2D,caloobject::CaloCluster2D> sorter;
   std::sort( clusters.begin(), clusters.end(), sorter.sort );
-  std::cout << "after sorting cluster \t";
-  for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
-    std::cout << (*it)->getHits().size() << "";
-  std::cout << std::endl;
   
   for(std::vector<caloobject::CaloCluster2D*>::iterator it=clusters.begin(); it!=clusters.end(); ++it)
     delete (*it);
