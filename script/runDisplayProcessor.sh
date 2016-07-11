@@ -20,9 +20,14 @@ then
     file="single_${particle}_${energy}GeV_${seed}.slcio"
     prefix="${particle}"
 else test $# -eq 1
-     energy=$1
-     file="multi_fsr_gamma${energy}GeV.slcio"
-     prefix="multi_fsr_gamma${energy}"
+     # energy=$1
+     # file="single_gamma${energy}GeV.slcio"
+     # prefix="single_gamma${energy}"
+     # file="multi_fsr_gamma${energy}GeV.slcio"
+     # prefix="multi_fsr_gamma${energy}"
+     seed=$1
+     file="mu-_jet_${seed}.slcio"
+     prefix="mu-_jet${seed}"
 fi
 
 list=`ls $path/$file`
@@ -53,9 +58,9 @@ cat > LCIO.xml <<EOF
   <parameter name="CollectionName" type="string" lcioInType="CalorimeterHit"> HGCALCalorimeterHit </parameter>
   <!--Name of the root output file-->
   <parameter name="PrefixPlotName" type="int"> ${prefix} </parameter>
-  <parameter name="PauseAfterDraw" type="bool"> false </parameter>
+  <parameter name="PauseAfterDraw" type="bool"> true </parameter>
   <parameter name="Geometry::NLayers" type="int"> 40 </parameter>
-  <parameter name="Geometry::NPixelsPerLayer" type="int"> 128 </parameter>
+  <parameter name="Geometry::NPixelsPerLayer" type="int"> 192 </parameter>
   <parameter name="Geometry::Geometry::PixelSize" type="int"> 10.0 </parameter>
   <parameter name="Hough::NThetas" type="int"> 50 </parameter>
   <parameter name="Hough::MinimumNBins" type="int"> 6 </parameter>
