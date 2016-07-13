@@ -232,6 +232,8 @@ void hgcalMuonFinder::init()
   outTree->Branch("simPhi",&simPhi);
   outTree->Branch("muonClusterEnergy","std::vector<double>",&muonClusterEnergy);
   trackPosition=new TH2D("trackPosition","trackPosition",100,-500,500,100,-500,500);
+  particlesPosition=new TH2D("particlesPosition","particlesPosition",100,-500,500,100,-500,500);
+  particlesEta=new TH1D("particlesEta","particlesEta",1000,0,15);
   
 }
 
@@ -339,7 +341,27 @@ void hgcalMuonFinder::processEvent( LCEvent * evt )
     }
   }
   _nEvt ++ ;
+  eventProperties(evt);
   std::cout << "Event processed : " << _nEvt << std::endl;
+}
+
+void hgcalMuonFinder::eventProperties( LCEvent * evt )
+{
+  int nparticles=evt->parameters().getIntVal(std::string("NumberOfParticles"));
+  std::vector<float> vecP;evt->parameters().getFloatVals(std::string("GunPosition"),vecP);
+  
+  std::ostringstream os( std::ostringstream::ate );
+  os.str("");
+  for(int i=0; i<nparticles; i++){
+    os.str("particleMomentum_");
+    os << i;
+    std::vector<float> vecM;evt->parameters().getFloatVals(os.str(),vecM);
+    float coeff= ( m_CaloGeomSetting.firstLayerZ - vecP.at(2) )/vecM.at(2);
+    particlesPosition->Fill( vecP.at(0) + coeff*vecM.at(0), vecP.at(1) + coeff*vecM.at(1) );
+    particlesEta->Fill( CLHEP::Hep3Vector(vecM.at(0),
+					  vecM.at(1),
+					  vecM.at(2)).eta() );
+  }
 }
 
 void hgcalMuonFinder::clearVec()

@@ -20,6 +20,7 @@
 #include <TFile.h>
 #include <TTree.h>
 #include <TH2D.h>
+#include <TH1D.h>
 
 using namespace lcio ;
 using namespace marlin ;
@@ -57,6 +58,7 @@ class hgcalMuonFinder : public Processor {
   void DoHough(std::vector<caloobject::CaloTrack*> &tracks);
   void tryToFindMuon();
   void clearVec();
+  void eventProperties( LCEvent * evt ) ; 
  protected:
 
   int _nRun ;
@@ -99,6 +101,8 @@ class hgcalMuonFinder : public Processor {
   TFile *outFile; 
   TTree* outTree;
   TH2D* trackPosition;
+  TH2D* particlesPosition;
+  TH1D* particlesEta;
     
 
   float distanceToProjection;

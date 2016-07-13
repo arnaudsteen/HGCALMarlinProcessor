@@ -5,7 +5,7 @@
 build/
 lib/
 src/*~
-script/*
+script/*~
 include/*~
 to-do
 displays/*
