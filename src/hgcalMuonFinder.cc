@@ -2,6 +2,7 @@
 #include <iostream>
 #include <time.h>
 #include <algorithm>
+#include <math.h>
 
 #include <EVENT/LCCollection.h>
 #include <EVENT/LCParameters.h>
@@ -39,7 +40,18 @@ hgcalMuonFinder::hgcalMuonFinder() : Processor("hgcalMuonFinder") {
 			      efficiencyDistance,
 			      (float)15.0 );
 
- /*------------caloobject::CaloGeom------------*/
+  std::vector<float> vec;
+  registerProcessorParameter( "LayerZPosition" ,
+			      "z position (in mm ) of each hgcal layers" ,
+			      layerZPosition,
+			      vec );
+
+  registerProcessorParameter( "CylinderRadius" ,
+			      "Cylinder radius (in mm ) arround the muon track to count hits and energy" ,
+			      cylinderRadius,
+			      float(20.0) );
+
+  /*------------caloobject::CaloGeom------------*/
   registerProcessorParameter( "Geometry::NLayers" ,
  			      "Number of layers",
  			      m_CaloGeomSetting.nLayers,
@@ -55,7 +67,7 @@ hgcalMuonFinder::hgcalMuonFinder() : Processor("hgcalMuonFinder") {
   registerProcessorParameter( "Geometry::FirstLayerZ" ,
  			      "Z position of the first calorimeter layer",
  			      m_CaloGeomSetting.firstLayerZ,
- 			      (float) -209.60); 
+ 			      (float) -209.60);  
   /*--------------------------------------------*/
 
   /*------------algorithm::Cluster------------*/
@@ -230,11 +242,18 @@ void hgcalMuonFinder::init()
   outTree->Branch("phi",&phi);
   outTree->Branch("simEta",&simEta);
   outTree->Branch("simPhi",&simPhi);
+  outTree->Branch("angleSimRec",&angleSimRec);
   outTree->Branch("muonClusterEnergy","std::vector<double>",&muonClusterEnergy);
+  outTree->Branch("nhitInCylinder","std::vector<int>",&nhitInCylinder);
+  outTree->Branch("energyInCylinder","std::vector<double>",&energyInCylinder);
   trackPosition=new TH2D("trackPosition","trackPosition",100,-500,500,100,-500,500);
   particlesPosition=new TH2D("particlesPosition","particlesPosition",100,-500,500,100,-500,500);
   particlesEta=new TH1D("particlesEta","particlesEta",1000,0,15);
-  
+
+  for(int i=0; i<m_CaloGeomSetting.nLayers; i++){
+    nhitInCylinder.push_back(0.);
+    energyInCylinder.push_back(0.);
+  }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -284,6 +303,8 @@ void hgcalMuonFinder::tryToFindMuon()
   simEta=gunMomentum.eta();
   simPhi=gunMomentum.phi();
 
+  angleSimRec =  (*bestIt)->orientationVector().angle( gunMomentum ) ;
+  
   if( ntrack>0 && distanceToProjection<efficiencyDistance )
     trackPosition->Fill( (*bestIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ).x() ,
 			 (*bestIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ).y() );
@@ -291,6 +312,30 @@ void hgcalMuonFinder::tryToFindMuon()
   for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
     delete (*it);
   tracks.clear(); 
+}
+
+/*---------------------------------------------------------------------------*/
+
+void hgcalMuonFinder::fillCylinder()
+{
+  for(int i=0; i<m_CaloGeomSetting.nLayers; i++){
+    nhitInCylinder.at(i)=0.;
+    energyInCylinder.at(i)=0.;
+  }
+  
+  algorithm::Distance<caloobject::CaloHit,CLHEP::Hep3Vector> dist;
+  for(std::map<int,std::vector<caloobject::CaloHit*> >::iterator it=hitMap.begin(); it!=hitMap.end(); ++it){
+    float coeff=( layerZPosition.at(it->first) - gunPosition.z() )/gunMomentum.z();
+    CLHEP::Hep3Vector trackPos( gunPosition.x() + coeff*gunMomentum.x() ,
+				gunPosition.y() + coeff*gunMomentum.y() ,
+				gunPosition.z() + coeff*gunMomentum.z() );
+    for( std::vector<caloobject::CaloHit*>::iterator jt=it->second.begin(); jt!=it->second.end(); ++jt){
+      if( dist.getDistance( (*jt),trackPos )<cylinderRadius ){
+	nhitInCylinder.at(it->first) += 1;
+	energyInCylinder.at(it->first) += (*jt)->getEnergy();
+      }
+    }
+  }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -333,6 +378,7 @@ void hgcalMuonFinder::processEvent( LCEvent * evt )
 	hitMap[cellID[2]].push_back(aHit);
       }
       tryToFindMuon();
+      fillCylinder();
       outTree->Fill();
       clearVec();
     }
@@ -379,7 +425,7 @@ void hgcalMuonFinder::check( LCEvent * evt ) {
 }
 
 
-void hgcalMuonFinder::end(){ 
+void hgcalMuonFinder::end(){
   outFile->Write();
   outFile->Close();
   delete algo_Cluster;

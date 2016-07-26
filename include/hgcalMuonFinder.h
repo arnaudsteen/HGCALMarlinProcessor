@@ -16,6 +16,7 @@
 #include "Algorithm/ClusteringHelper.h"
 #include "Algorithm/InteractionFinder.h"
 #include "Algorithm/Hough.h"
+#include "Algorithm/Distance.h"
 
 #include <TFile.h>
 #include <TTree.h>
@@ -58,6 +59,7 @@ class hgcalMuonFinder : public Processor {
   void DoHough(std::vector<caloobject::CaloTrack*> &tracks);
   void tryToFindMuon();
   void clearVec();
+  void fillCylinder();
   void eventProperties( LCEvent * evt ) ; 
  protected:
 
@@ -75,6 +77,8 @@ class hgcalMuonFinder : public Processor {
   LCCollection * col;
   std::string outputName;
   float efficiencyDistance;
+  std::vector<float> layerZPosition;
+  float cylinderRadius;
   /*------------------------------------------------------------------------------*/
 
   /*--------------------Algorithms setting parameter structure--------------------*/
@@ -104,15 +108,17 @@ class hgcalMuonFinder : public Processor {
   TH2D* particlesPosition;
   TH1D* particlesEta;
     
-
   float distanceToProjection;
   int ntrack; 
   float eta;
   float phi;
   float simEta;
   float simPhi;
-
+  float angleSimRec;
+  
   std::vector<double> muonClusterEnergy;
+  std::vector<int> nhitInCylinder;
+  std::vector<double> energyInCylinder;
 
   /*-------------------Event parameters-------------------*/
   CLHEP::Hep3Vector gunPosition;
