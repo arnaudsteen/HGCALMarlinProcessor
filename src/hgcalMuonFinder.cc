@@ -303,10 +303,13 @@ void hgcalMuonFinder::tryToFindMuon()
   simEta=gunMomentum.eta();
   simPhi=gunMomentum.phi();
 
-  if( bestIt!=tracks.end() )
+  if( ntrack>0 )
     angleSimRec =  (*bestIt)->orientationVector().angle( gunMomentum ) ;
-  else
-    angleSimRec=-1;
+  else{
+    angleSimRec=-1.;
+    std::cout << "angleSimRec = " << angleSimRec << std::endl;
+  }
+  
   
   if( ntrack>0 && distanceToProjection<efficiencyDistance )
     trackPosition->Fill( (*bestIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ).x() ,
