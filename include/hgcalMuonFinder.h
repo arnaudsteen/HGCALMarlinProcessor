@@ -26,6 +26,19 @@
 using namespace lcio ;
 using namespace marlin ;
 
+
+class  myVerbosityLevel{
+ public :
+  myVerbosityLevel(std::string aString){
+    if( aString==std::string("DEBUG") )  theLevel=DEBUG;
+    else if( aString==std::string("MESSAGE") )  theLevel=MESSAGE;
+    else if( aString==std::string("WARNING") )  theLevel=WARNING;
+    else if( aString==std::string("ERROR") )  theLevel=ERROR;
+  }
+  enum VERBOSITY_LEVEL{ DEBUG, MESSAGE, WARNING, ERROR };
+  VERBOSITY_LEVEL theLevel;
+};
+
 class hgcalMuonFinder : public Processor {
   
  public:
@@ -69,6 +82,8 @@ class hgcalMuonFinder : public Processor {
    */
   std::vector<std::string> _hgcalCollections;
 
+  myVerbosityLevel::VERBOSITY_LEVEL processorVerbosityLevel;
+
  private:
   std::map<int,std::vector<caloobject::CaloHit*> > hitMap;
   
@@ -79,6 +94,8 @@ class hgcalMuonFinder : public Processor {
   float efficiencyDistance;
   std::vector<float> layerZPosition;
   float cylinderRadius;
+  std::string verbLevel;
+
   /*------------------------------------------------------------------------------*/
 
   /*--------------------Algorithms setting parameter structure--------------------*/

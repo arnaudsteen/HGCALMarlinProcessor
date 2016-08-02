@@ -51,6 +51,11 @@ hgcalMuonFinder::hgcalMuonFinder() : Processor("hgcalMuonFinder") {
 			      cylinderRadius,
 			      float(20.0) );
 
+  registerProcessorParameter( "MyVerbosityLevel" ,
+			      "Verbosity level; available values : DEBUG, MESSAGE , WARNING, ERROR" ,
+			      verbLevel ,
+			      std::string("MESSAGE") );
+  
   /*------------caloobject::CaloGeom------------*/
   registerProcessorParameter( "Geometry::NLayers" ,
  			      "Number of layers",
@@ -130,24 +135,24 @@ hgcalMuonFinder::hgcalMuonFinder() : Processor("hgcalMuonFinder") {
 
   /*------------algorithm::InteractionFinder-----------*/
   registerProcessorParameter( "InteractionFinder::MinSize" ,
-    			      "Minimum cluster size for to define an interaction point",
-    			      m_InteractionFinderParameterSetting.minSize,
-    			      (int) 4 ); 
+     			      "Minimum cluster size for to define an interaction point",
+     			      m_InteractionFinderParameterSetting.minSize,
+     			      (int) 4 );
 
   registerProcessorParameter( "InteractionFinder::MaxRadius" ,
-    			      "Maximum transversal distance to look for clusters",
-    			      m_InteractionFinderParameterSetting.maxRadius,
-    			      (float) 50.0 ); 
+     			      "Maximum transversal distance to look for clusters",
+     			      m_InteractionFinderParameterSetting.maxRadius,
+     			      (float) 50.0 );
 
   registerProcessorParameter( "InteractionFinder::MaxDepth" ,
-    			      "Maximum depth (number of layers) to look for clusters",
-    			      m_InteractionFinderParameterSetting.maxDepth,
-    			      (int) 4 ); 
+     			      "Maximum depth (number of layers) to look for clusters",
+     			      m_InteractionFinderParameterSetting.maxDepth,
+     			      (int) 4 );
 
   registerProcessorParameter( "InteractionFinder::MinNumberOfCluster" ,
-    			      "Minimum number of found clusters (big enough) after the interaction point",
-    			      m_InteractionFinderParameterSetting.minNumberOfCluster,
-    			      (int) 3 ); 
+     			      "Minimum number of found clusters (big enough) after the interaction point",
+     			      m_InteractionFinderParameterSetting.minNumberOfCluster,
+     			      (int) 3 );
 
   /*------------algorithm::Hough-----------*/
   registerProcessorParameter( "Hough::NThetas" ,
@@ -206,6 +211,8 @@ void hgcalMuonFinder::init()
 { 
   printParameters() ;
 
+  processorVerbosityLevel=myVerbosityLevel(verbLevel).theLevel;
+
   _nRun = 0 ;
   _nEvt = 0 ;
 
@@ -246,9 +253,9 @@ void hgcalMuonFinder::init()
   outTree->Branch("muonClusterEnergy","std::vector<double>",&muonClusterEnergy);
   outTree->Branch("nhitInCylinder","std::vector<int>",&nhitInCylinder);
   outTree->Branch("energyInCylinder","std::vector<double>",&energyInCylinder);
-  trackPosition=new TH2D("trackPosition","trackPosition",100,-500,500,100,-500,500);
-  particlesPosition=new TH2D("particlesPosition","particlesPosition",100,-500,500,100,-500,500);
-  particlesEta=new TH1D("particlesEta","particlesEta",1000,0,15);
+  trackPosition=new TH2D("h2_trackPosition","h2_trackPosition",100,-500,500,100,-500,500);
+  particlesPosition=new TH2D("h2_particlesPosition","h2_particlesPosition",100,-500,500,100,-500,500);
+  particlesEta=new TH1D("h1_particlesEta","h1_particlesEta",1000,0,15);
 
   for(int i=0; i<m_CaloGeomSetting.nLayers; i++){
     nhitInCylinder.push_back(0.);
@@ -290,8 +297,12 @@ void hgcalMuonFinder::tryToFindMuon()
   algorithm::Distance<CLHEP::Hep3Vector,float> dist;
   float minDist=std::numeric_limits<float>::max();
   std::vector<caloobject::CaloTrack*>::iterator bestIt;
+  if( processorVerbosityLevel==myVerbosityLevel::DEBUG ) std::cout << "ntrack reco tracks = " << ntrack << std::endl;
   for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
     float dist = (float)(gunProjection-(*it)->expectedTrackProjection(gunProjection.z())).mag() ;
+    if( processorVerbosityLevel==myVerbosityLevel::DEBUG ) std::cout << "orientation vector = " << (*it)->orientationVector().cosTheta() << "\t"
+								    << "track projection in 1st layer = " << (*it)->expectedTrackProjection(gunProjection.z()) << std::endl;
+	
     if( dist<minDist ){
       minDist=dist;
       eta=(*it)->orientationVector().eta();
@@ -305,15 +316,22 @@ void hgcalMuonFinder::tryToFindMuon()
 
   if( ntrack>0 )
     angleSimRec =  (*bestIt)->orientationVector().angle( gunMomentum ) ;
-  else{
+  else
     angleSimRec=-1.;
-    std::cout << "angleSimRec = " << angleSimRec << std::endl;
-  }
   
-  
-  if( ntrack>0 && distanceToProjection<efficiencyDistance )
+  if( ntrack>0 && distanceToProjection<efficiencyDistance ){
     trackPosition->Fill( (*bestIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ).x() ,
 			 (*bestIt)->expectedTrackProjection( m_CaloGeomSetting.firstLayerZ ).y() );
+    if( processorVerbosityLevel==myVerbosityLevel::DEBUG ) std::cout << "find a good candidate track at " << distanceToProjection << std::endl;
+  }
+  else if( ntrack>0 && processorVerbosityLevel==myVerbosityLevel::DEBUG ){
+    std::cout << "fail to reconstruct the muon; best track at : " << (*bestIt)->expectedTrackProjection(gunProjection.z()) << "\t"
+	      << "orientation vector = "  << (*bestIt)->orientationVector().theta() << "\t"
+	      << "nclusters in track = " << (*bestIt)->getClusters().size() << std::endl;
+  }
+  else if( processorVerbosityLevel==myVerbosityLevel::DEBUG ){
+    std::cout << "fail to reconstruct the muon; no track found" << std::endl;
+  }
 
   for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it)
     delete (*it);
@@ -342,11 +360,18 @@ void hgcalMuonFinder::fillCylinder()
       }
     }
   }
+
+  if( processorVerbosityLevel==myVerbosityLevel::DEBUG ){
+    std::cout << "Muon proj in 1st layer = " << gunProjection << "\t" 
+	      << "Muon orientation vector = " << gunMomentum.theta() << std::endl;
+    for(unsigned int i=0; i<nhitInCylinder.size(); i++)
+      std::cout << i << "\t" << nhitInCylinder.at(i) << "\t" << energyInCylinder.at(i) << "\n";
+  }
 }
 
 /*---------------------------------------------------------------------------*/
 
-  void hgcalMuonFinder::processRunHeader( LCRunHeader* run)
+void hgcalMuonFinder::processRunHeader( LCRunHeader* run)
 {
   _nRun++ ;
   _nEvt = 0;

@@ -254,7 +254,7 @@ void hgcalDisplayProcessor::init()
   TH2D *h=NULL;
   for(unsigned int i=0; i<histoName.size(); ++i){
     if( histoName.at(i).find("space")<histoName.at(i).size() ){
-      h=new TH2D(histoName.at(i).c_str(),"",4*m_CaloGeomSetting.nLayers,0.0,m_CaloGeomSetting.nLayers,4*m_CaloGeomSetting.nPixelsPerLayer,0.0,m_CaloGeomSetting.nPixelsPerLayer);
+      h=new TH2D(histoName.at(i).c_str(),"",4*m_CaloGeomSetting.nLayers,0.0,m_CaloGeomSetting.nLayers,4*m_CaloGeomSetting.nPixelsPerLayer,-m_CaloGeomSetting.nPixelsPerLayer/4*m_CaloGeomSetting.pixelSize,m_CaloGeomSetting.nPixelsPerLayer/4*m_CaloGeomSetting.pixelSize);
       h->SetMarkerStyle(20);
       h->SetMarkerSize(.5);
       h->GetXaxis()->SetTitle("layer");
@@ -278,7 +278,6 @@ void hgcalDisplayProcessor::init()
     std::pair< std::string,TH2D* > p( histoName.at(i),h );
     histo2DMap.insert(p);
   }
-  
 }
 
 /*---------------------------------------------------------------------------*/
@@ -293,12 +292,12 @@ void hgcalDisplayProcessor::fillSpaceHisto( )
 {
   for( std::vector<HitAndTag>::iterator it=hitAndTagVec.begin(); it!=hitAndTagVec.end(); ++it ){
     if( (*it).tag==normal ){
-      histo2DMap[ std::string("spaceXZ_normal") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[0] );
-      histo2DMap[ std::string("spaceYZ_normal") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[1] );
+      histo2DMap[ std::string("spaceXZ_normal") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getPosition().x() );
+      histo2DMap[ std::string("spaceYZ_normal") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getPosition().y() );
     }
     else if( (*it).tag==track ){
-      histo2DMap[ std::string("spaceXZ_track") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[0] );
-      histo2DMap[ std::string("spaceYZ_track") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getCellID()[1] );
+      histo2DMap[ std::string("spaceXZ_track") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getPosition().x() );
+      histo2DMap[ std::string("spaceYZ_track") ]->Fill( (*it).hit->getCellID()[2], (*it).hit->getPosition().y() );
     }
   }
   //std::cout << std::string("spaceXZ_normal") << "\t" << histo2DMap[ std::string("spaceXZ_normal") ]->GetEntries() << std::endl;;
@@ -318,7 +317,7 @@ void hgcalDisplayProcessor::drawHistos()
   histo2DMap[ std::string("spaceXZ_normal") ]->Draw();
   histo2DMap[ std::string("spaceXZ_track") ]->Draw("same");
   canvasMap[ std::string("spaceXZ") ]->Update();
-  canvasMap[ std::string("spaceXZ") ]->SaveAs(name.str().c_str());
+  //canvasMap[ std::string("spaceXZ") ]->SaveAs(name.str().c_str());
 
   
   name.str("");
@@ -327,7 +326,7 @@ void hgcalDisplayProcessor::drawHistos()
   histo2DMap[ std::string("spaceYZ_normal") ]->Draw();
   histo2DMap[ std::string("spaceYZ_track") ]->Draw("same");
   canvasMap[ std::string("spaceYZ") ]->Update();
-  canvasMap[ std::string("spaceYZ") ]->SaveAs(name.str().c_str());
+  //canvasMap[ std::string("spaceYZ") ]->SaveAs(name.str().c_str());
   //sleep(3);
   if(_pauseAfterDraw)
     canvasMap.begin()->second->WaitPrimitive();
