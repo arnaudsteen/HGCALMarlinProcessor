@@ -301,7 +301,7 @@ void hgcalMuonFinder::tryToFindMuon()
   for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
     float dist = (float)(gunProjection-(*it)->expectedTrackProjection(gunProjection.z())).mag() ;
     if( processorVerbosityLevel==myVerbosityLevel::DEBUG ) std::cout << "orientation vector = " << (*it)->orientationVector().cosTheta() << "\t"
-								    << "track projection in 1st layer = " << (*it)->expectedTrackProjection(gunProjection.z()) << std::endl;
+								     << "track projection in 1st layer = " << (*it)->expectedTrackProjection(gunProjection.z()) << std::endl;
 	
     if( dist<minDist ){
       minDist=dist;

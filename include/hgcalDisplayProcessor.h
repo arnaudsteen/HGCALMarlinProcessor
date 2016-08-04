@@ -16,17 +16,24 @@
 #include "Algorithm/ClusteringHelper.h"
 #include "Algorithm/InteractionFinder.h"
 #include "Algorithm/Hough.h"
+#include "Algorithm/Distance.h"
 
 #include <TCanvas.h>
+#include <TGraph2D.h>
+#include <TGraph.h>
+#include <TH1D.h>
 #include <TH2D.h>
+#include <TF1.h>
 #include <TApplication.h>
+#include <TPolyLine3D.h>
 
 using namespace lcio ;
 using namespace marlin ;
 
 enum HitTag{
   normal,
-  track
+  track,
+  reco_muon
 };
 
 struct HitAndTag{
@@ -67,11 +74,20 @@ class hgcalDisplayProcessor : public Processor {
   virtual void end() ;
 
   void DoHough();
+  void bookGraph2D();
   void fillSpaceHisto();
+  void fillHoughSpaceHisto( std::vector<caloobject::CaloCluster2D*> &clusters );
   void drawHistos();
   void resetHisto();
   void clearVec();
+  void tryToFindMuon( std::vector<caloobject::CaloTrack*> &tracks );
+
  protected:
+
+  static double fitFunc(double *x, double *par)
+  {
+    return par[0] + x[0]*par[1];
+  }
 
   int _nRun ;
   int _nEvt ;
@@ -88,6 +104,8 @@ class hgcalDisplayProcessor : public Processor {
   LCCollection * col;
   std::string _prefixPlotName;
   bool _pauseAfterDraw;
+  float efficiencyDistance;
+  std::vector<float> layerZPosition;
   /*---------------------------------------------------------*/
 
 
@@ -113,7 +131,19 @@ class hgcalDisplayProcessor : public Processor {
   
    std::map< std::string,TCanvas* > canvasMap;
    std::map< std::string,TH2D* > histo2DMap;
+   std::map< std::string,TGraph* > graphMap;
+   std::map< std::string,TGraph2D* > graph2DMap;
+   TH1D *hZX;
+   TH1D *hZY;
+   TF1 *fZX;
+   TF1 *fZY;
    TApplication* app;
+
+   /*-------------------Event parameters-------------------*/
+   CLHEP::Hep3Vector gunPosition;
+   CLHEP::Hep3Vector gunProjection; 
+   CLHEP::Hep3Vector gunMomentum;
+   /*------------------------------------------------------*/
 } ;
 
 #endif
