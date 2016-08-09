@@ -243,6 +243,7 @@ void hgcalMuonFinder::init()
     os << std::string(".root");
   outFile=new TFile(os.str().c_str(),"RECREATE");
   outTree = new TTree("tree","Hough efficiency tree");
+  outTree->Branch("nhit",&numElements);
   outTree->Branch("distanceToProjection",&distanceToProjection);
   outTree->Branch("ntrack",&ntrack);
   outTree->Branch("eta",&eta);
@@ -253,9 +254,12 @@ void hgcalMuonFinder::init()
   outTree->Branch("muonClusterEnergy","std::vector<double>",&muonClusterEnergy);
   outTree->Branch("nhitInCylinder","std::vector<int>",&nhitInCylinder);
   outTree->Branch("energyInCylinder","std::vector<double>",&energyInCylinder);
-  trackPosition=new TH2D("h2_trackPosition","h2_trackPosition",100,-500,500,100,-500,500);
-  particlesPosition=new TH2D("h2_particlesPosition","h2_particlesPosition",100,-500,500,100,-500,500);
+  trackPosition=new TH2D("h2_trackPosition","h2_trackPosition",200,-1000,1000,200,-1000,1000);
+  particlesPosition=new TH2D("h2_particlesPosition","h2_particlesPosition",200,-1000,1000,200,-1000,1000);
+  recoTracksChi2vsCosTheta=new TH2D("h2_recoTracksChi2vsCosTheta","h2_recoTracksChi2vsCosTheta",1000,0.0,100,1000,0.0,1);
   particlesEta=new TH1D("h1_particlesEta","h1_particlesEta",1000,0,15);
+  recoTracksCosTheta=new TH1D("h1_recoTracksCosTheta","h1_recoTracksCosTheta",1000,0.0,1.0);
+  recoTracksChi2=new TH1D("h1_recoTracksChi2","h1_recoTracksChi2",1000,0.0,100);
 
   for(int i=0; i<m_CaloGeomSetting.nLayers; i++){
     nhitInCylinder.push_back(0.);
@@ -299,6 +303,9 @@ void hgcalMuonFinder::tryToFindMuon()
   std::vector<caloobject::CaloTrack*>::iterator bestIt;
   if( processorVerbosityLevel==myVerbosityLevel::DEBUG ) std::cout << "ntrack reco tracks = " << ntrack << std::endl;
   for(std::vector<caloobject::CaloTrack*>::iterator it=tracks.begin(); it!=tracks.end(); ++it){
+    recoTracksCosTheta->Fill( (*it)->orientationVector().cosTheta() );
+    recoTracksChi2->Fill( (*it)->getChi2() );
+    recoTracksChi2vsCosTheta->Fill( (*it)->getChi2(),(*it)->orientationVector().cosTheta() );
     float dist = (float)(gunProjection-(*it)->expectedTrackProjection(gunProjection.z())).mag() ;
     if( processorVerbosityLevel==myVerbosityLevel::DEBUG ) std::cout << "orientation vector = " << (*it)->orientationVector().cosTheta() << "\t"
 								     << "track projection in 1st layer = " << (*it)->expectedTrackProjection(gunProjection.z()) << std::endl;

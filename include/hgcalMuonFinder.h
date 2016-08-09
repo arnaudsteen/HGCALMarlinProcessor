@@ -123,8 +123,12 @@ class hgcalMuonFinder : public Processor {
   TTree* outTree;
   TH2D* trackPosition;
   TH2D* particlesPosition;
+  TH2D* recoTracksChi2vsCosTheta;
+
   TH1D* particlesEta;
-    
+  TH1D* recoTracksCosTheta;
+  TH1D* recoTracksChi2;
+  
   float distanceToProjection;
   int ntrack; 
   float eta;

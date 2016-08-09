@@ -253,11 +253,11 @@ void hgcalDisplayProcessor::init()
 
   fZX = new TF1("fZX","pol1",layerZPosition.at(0),layerZPosition.at(m_CaloGeomSetting.nLayers-1));
   fZX->SetLineWidth(2);
-  fZX->SetLineColor(kBlue-6);
+  fZX->SetLineColor(kGreen);
   fZX->SetLineStyle(7);
   fZY = new TF1("fZY","pol1",layerZPosition.at(0),layerZPosition.at(m_CaloGeomSetting.nLayers-1));
   fZY->SetLineWidth(2);
-  fZY->SetLineColor(kBlue-6);
+  fZY->SetLineColor(kGreen);
   fZY->SetLineStyle(7);
   
   std::vector< std::string > histoName;
@@ -271,7 +271,7 @@ void hgcalDisplayProcessor::init()
   for(unsigned int i=0; i<histoName.size(); ++i){
     if( histoName.at(i).find("hough")<histoName.at(i).size() ){
       h=new TH2D(histoName.at(i).c_str(),"",
-		 m_HoughParameterSetting.thetaSteps,0,M_PI,
+		 m_HoughParameterSetting.thetaSteps+1,0.0,M_PI,
 		 m_CaloGeomSetting.nPixelsPerLayer/2,-m_CaloGeomSetting.nPixelsPerLayer/4*m_CaloGeomSetting.pixelSize,m_CaloGeomSetting.nPixelsPerLayer/4*m_CaloGeomSetting.pixelSize);
       if( histoName.at(i).find("X")<histoName.at(i).size() )
 	h->SetTitle("z-x hough space");
@@ -483,7 +483,7 @@ void hgcalDisplayProcessor::drawHistos()
   canvasMap[ std::string("spaceXZ") ]->cd();
   hZX->Draw("axis");
   fZX->SetParameters( gunProjection.x(), gunMomentum.x()/gunMomentum.z());
-  fZX->Draw("same");
+  if( graphMap[ std::string("XZrecomuon") ]->GetN()==0 ) fZX->Draw("same");
   if( graphMap[ std::string("XZnormal") ]->GetN()>0 )graphMap[ std::string("XZnormal") ]->Draw("psame");
   if( graphMap[ std::string("XZtrack") ]->GetN()>0 )graphMap[ std::string("XZtrack") ]->Draw("psame");
   if( graphMap[ std::string("XZrecomuon") ]->GetN()>0 )graphMap[ std::string("XZrecomuon") ]->Draw("psame");
@@ -495,7 +495,7 @@ void hgcalDisplayProcessor::drawHistos()
   canvasMap[ std::string("spaceYZ") ]->cd();
   hZY->Draw("axis");
   fZY->SetParameters( gunProjection.y(), gunMomentum.y()/gunMomentum.z());
-  fZY->Draw("same");
+  if( graphMap[ std::string("YZrecomuon") ]->GetN()==0 )fZY->Draw("same");
   if( graphMap[ std::string("YZnormal") ]->GetN()>0 )graphMap[ std::string("YZnormal") ]->Draw("psame");
   if( graphMap[ std::string("YZtrack") ]->GetN()>0 )graphMap[ std::string("YZtrack") ]->Draw("psame");
   if( graphMap[ std::string("YZrecomuon") ]->GetN()>0 )graphMap[ std::string("YZrecomuon") ]->Draw("psame");
@@ -507,7 +507,7 @@ void hgcalDisplayProcessor::drawHistos()
   canvasMap[ std::string("space3D") ]->SetPhi(15);     //<========
   TPolyLine3D line3D(2);
   line3D.SetLineWidth(2);
-  line3D.SetLineColor(kBlue);
+  line3D.SetLineColor(kGreen);
   line3D.SetLineStyle(2);
   line3D.SetPoint(0,
 		  layerZPosition.at(0),
@@ -521,7 +521,7 @@ void hgcalDisplayProcessor::drawHistos()
   if( graph2DMap[ std::string("normal")   ]->GetN()>0 ) graph2DMap[ std::string("normal") ]->Draw("psame");
   if( graph2DMap[ std::string("track")    ]->GetN()>0 ) graph2DMap[ std::string("track") ]->Draw("psame");
   if( graph2DMap[ std::string("recomuon") ]->GetN()>0 ) graph2DMap[ std::string("recomuon") ]->Draw("psame");
-  line3D.Draw("same");
+  if( graph2DMap[ std::string("recomuon") ]->GetN()==0 )line3D.Draw("same");
   canvasMap[ std::string("space3D") ]->Update();
 
   if(_pauseAfterDraw)
@@ -600,6 +600,14 @@ void hgcalDisplayProcessor::tryToFindMuon( std::vector<caloobject::CaloTrack*> &
 	  (*it).tag=reco_muon;
       }
   }
+  else if( tracks.size()>0 ){
+    std::cout << "fail to reconstruct the muon; best track at : " << (*bestIt)->expectedTrackProjection(gunProjection.z()) << "\t"
+	      << "at : " << minDist << " mm from the real track \t"
+	      << "orientation vector = "  << (*bestIt)->orientationVector().theta() << "\t"
+	      << "nclusters in track = " << (*bestIt)->getClusters().size() << std::endl;
+  }
+  else
+    std::cout << "fail to reconstruct any track" << std::endl;
 }
 
 
@@ -636,7 +644,10 @@ void hgcalDisplayProcessor::processEvent( LCEvent * evt )
     try{
       col = evt->getCollection( _hgcalCollections[i].c_str() ) ;
       numElements = col->getNumberOfElements();
-      if(numElements<10)continue;
+      if(numElements<10){
+	continue;
+	std::cout << "less than 10 hits" << std::endl;
+      }
       for (int j=0; j < numElements; ++j) {
 	CalorimeterHit * hit = dynamic_cast<CalorimeterHit*>( col->getElementAt( j ) ) ;
 	CLHEP::Hep3Vector vec(hit->getPosition()[0],hit->getPosition()[1],hit->getPosition()[2]);
